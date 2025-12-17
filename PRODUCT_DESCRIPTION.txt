@@ -76,6 +76,29 @@ Core Features Implemented
     - Create routes by tapping points on a map (polyline).
     - Log route usage categorized as walk/jog/bike.
     - Uses online tiles (may be slower/unstable depending on device/network).
+  
+  NEW — Muscle Heat Map (experimental):
+    - Visualize muscle fatigue and training volume across all muscle groups.
+    - Body diagram showing color-coded muscle status:
+      - Fatigue view: Green = recovered, Yellow = moderate, Red = needs rest.
+      - Volume view: Blue = undertrained, Green = optimal, Orange/Red = high volume.
+    - Compare your strength to average lifters with similar profile (age, weight, height, gender).
+    - Workout suggestions based on muscle fatigue (e.g., "Push muscles fatigued, try pull day").
+    - Exercise-to-muscle mapping for 50+ common exercises.
+    - User profile setup for personalized strength comparisons.
+
+- Goals & Achievements
+  NEW — Fitness Goals with Milestones:
+    - Create custom fitness goals with multiple milestones.
+    - Goal categories: Strength, Endurance, Weight Loss, Muscle Gain, Flexibility, Consistency, Custom.
+    - Track milestone completion with progress visualization.
+    - View active and completed goals separately.
+    - Goals card on Progress screen shows quick overview.
+  
+  NEW — Achievements (Placeholder):
+    - Achievement grid showing locked/unlocked badges.
+    - Placeholder achievements: First Workout, Week Warrior, Streak Master, Century Club, Heavy Lifter, Goal Getter, Consistency King, PR Hunter.
+    - Full achievement tracking coming soon.
 
 Design Goals
 - Web-first but native-ready: build once, ship everywhere.
@@ -130,6 +153,10 @@ Where things live in the code
   - Smart rest logic
   - Superset mode state
   - Warm-up set generation
+  - Muscle heat map calculations (exercise-to-muscle mapping, fatigue/volume)
+  - Strength comparison logic (vs average lifters)
+  - Fitness goals with milestones
+  - User profile for comparisons
 - Tab shell + overlay: lib/ui/root_shell.dart
 - Dynamic Island: lib/ui/widgets/dynamic_island.dart
   - Gesture detection
@@ -147,7 +174,17 @@ Where things live in the code
   - Settings: lib/ui/screens/settings_screen.dart
     - Smart rest toggle
     - Superset mode toggle
+    - Experimental features (Map, Heat Map)
   - Progress: lib/ui/screens/progress_screen.dart
+    - Goals card with quick access
+  - Goals & Achievements: lib/ui/screens/goals_screen.dart
+    - Goals tab with milestone tracking
+    - Achievements tab (placeholder)
+  - Muscle Heat Map: lib/ui/screens/muscle_heat_map_screen.dart
+    - Fatigue view
+    - Volume view
+    - Strength comparison view
+    - User profile dialog
 
 Current limitations (intentional for v1)
 - No cloud sync and no login.
@@ -160,9 +197,12 @@ Recommended next upgrades
 - iOS Live Activities integration for rest timer on lock screen.
 - Voice logging ("Add set, 10 reps, 80 kg").
 - Watch integration (Apple Watch / Wear OS).
-- Exercise library with muscle group tagging.
-- Volume tracking (sets × reps × weight per muscle group).
+- ✅ Exercise library with muscle group tagging (implemented in Heat Map).
+- ✅ Volume tracking (sets × reps × weight per muscle group) (implemented in Heat Map).
 - Rest timer sound/vibration alerts.
+- Achievement unlocking logic (currently placeholder).
+- Social features (share progress, compare with friends).
+- Workout templates from AI suggestions.
 
 New Feature Summary (This Update)
 1. Progressive Overload Nudge — Gold indicator when ready to increase weight.
@@ -173,6 +213,20 @@ New Feature Summary (This Update)
 6. Contextual Island States — Different labels for rest day, pre-workout, etc.
 7. Morphing Save Button — Grows and glows green as you log more sets.
 8. Workout Streak Celebration — Orange glow and emoji when hitting milestones.
+
+Latest Update — Muscle Heat Map & Goals:
+9. Muscle Heat Map (Experimental) — Visualize muscle fatigue and training volume.
+   - Body diagram with color-coded muscle groups.
+   - Fatigue tracking helps plan recovery and avoid overtraining.
+   - Volume tracking shows if muscles are undertrained or overtrained.
+   - Compare your strength to average lifters with similar profile.
+   - Smart workout suggestions based on current muscle fatigue.
+10. User Profile — Set age, weight, height, gender for personalized comparisons.
+11. Fitness Goals with Milestones — Create goals, add milestones, track progress.
+    - Multiple goal categories (strength, endurance, weight loss, etc.).
+    - Milestone completion tracking with checkboxes.
+    - Progress visualization on goal cards.
+12. Achievements (Placeholder) — Grid of achievement badges (coming soon).
 
 Update policy
 - Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.

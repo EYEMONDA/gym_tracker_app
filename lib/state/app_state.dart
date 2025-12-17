@@ -42,6 +42,9 @@ class AppState extends ChangeNotifier {
   /// User profile for comparisons (optional).
   UserProfile? userProfile;
 
+  /// User-defined fitness goals with milestones.
+  final List<FitnessGoal> fitnessGoals = [];
+
   /// Which exercise is currently “focused” for fast logging.
   int activeExerciseIndex = 0;
 
@@ -276,6 +279,9 @@ class AppState extends ChangeNotifier {
         smartRestEnabled = db.smartRestEnabled;
         experimentalHeatMapEnabled = db.experimentalHeatMapEnabled;
         userProfile = db.userProfile;
+        fitnessGoals
+          ..clear()
+          ..addAll(db.fitnessGoals);
       } catch (_) {
         // If the DB is corrupt, keep the app usable.
       }
@@ -309,6 +315,7 @@ class AppState extends ChangeNotifier {
       smartRestEnabled: smartRestEnabled,
       experimentalHeatMapEnabled: experimentalHeatMapEnabled,
       userProfile: userProfile,
+      fitnessGoals: fitnessGoals,
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
   }
@@ -506,6 +513,65 @@ class AppState extends ChangeNotifier {
     await _persist();
     notifyListeners();
   }
+
+  // ---------------------------
+  // Fitness Goals
+  // ---------------------------
+
+  Future<void> addFitnessGoal(FitnessGoal goal) async {
+    fitnessGoals.add(goal);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> updateFitnessGoal(String goalId, FitnessGoal updated) async {
+    final idx = fitnessGoals.indexWhere((g) => g.id == goalId);
+    if (idx == -1) return;
+    fitnessGoals[idx] = updated;
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> removeFitnessGoal(String goalId) async {
+    fitnessGoals.removeWhere((g) => g.id == goalId);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> toggleMilestoneComplete(String goalId, int milestoneIndex) async {
+    final idx = fitnessGoals.indexWhere((g) => g.id == goalId);
+    if (idx == -1) return;
+    final goal = fitnessGoals[idx];
+    if (milestoneIndex < 0 || milestoneIndex >= goal.milestones.length) return;
+    
+    final milestone = goal.milestones[milestoneIndex];
+    final updatedMilestone = milestone.copyWith(
+      isCompleted: !milestone.isCompleted,
+      completedAt: !milestone.isCompleted ? DateTime.now() : null,
+    );
+    
+    final updatedMilestones = List<GoalMilestone>.from(goal.milestones);
+    updatedMilestones[milestoneIndex] = updatedMilestone;
+    
+    fitnessGoals[idx] = goal.copyWith(milestones: updatedMilestones);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Get progress percentage for a goal (0.0 - 1.0).
+  double getGoalProgress(FitnessGoal goal) {
+    if (goal.milestones.isEmpty) return 0.0;
+    final completed = goal.milestones.where((m) => m.isCompleted).length;
+    return completed / goal.milestones.length;
+  }
+
+  /// Get all active (non-completed) goals.
+  List<FitnessGoal> get activeGoals => 
+      fitnessGoals.where((g) => getGoalProgress(g) < 1.0).toList();
+
+  /// Get all completed goals.
+  List<FitnessGoal> get completedGoals => 
+      fitnessGoals.where((g) => getGoalProgress(g) >= 1.0).toList();
 
   /// Get muscle groups targeted by an exercise name.
   List<MuscleGroup> getMuscleGroups(String exerciseName) {
@@ -967,6 +1033,7 @@ class AppState extends ChangeNotifier {
     defaultRestSeconds = 90;
     weeklyWorkoutGoal = 3;
     userProfile = null;
+    fitnessGoals.clear();
     routineTemplates
       ..clear()
       ..addAll(_defaultTemplates());
@@ -1283,6 +1350,7 @@ class AppDb {
     required this.smartRestEnabled,
     required this.experimentalHeatMapEnabled,
     required this.userProfile,
+    required this.fitnessGoals,
   });
 
   final List<WorkoutSession> sessions;
@@ -1300,6 +1368,7 @@ class AppDb {
   final bool smartRestEnabled;
   final bool experimentalHeatMapEnabled;
   final UserProfile? userProfile;
+  final List<FitnessGoal> fitnessGoals;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
@@ -1308,6 +1377,7 @@ class AppDb {
     final rawRoutes = (json['mapRoutes'] as List<dynamic>? ?? const []);
     final rawRouteLogs = (json['routeActivityLogs'] as List<dynamic>? ?? const []);
     final rawProfile = json['userProfile'] as Map<String, Object?>?;
+    final rawGoals = (json['fitnessGoals'] as List<dynamic>? ?? const []);
     return AppDb(
       sessions: rawSessions
           .whereType<Map<String, Object?>>()
@@ -1339,6 +1409,7 @@ class AppDb {
       smartRestEnabled: (json['smartRestEnabled'] as bool?) ?? true,
       experimentalHeatMapEnabled: (json['experimentalHeatMapEnabled'] as bool?) ?? false,
       userProfile: rawProfile != null ? UserProfile.fromJson(rawProfile) : null,
+      fitnessGoals: rawGoals.whereType<Map<String, Object?>>().map(FitnessGoal.fromJson).toList(),
     );
   }
 
@@ -1358,6 +1429,7 @@ class AppDb {
         'smartRestEnabled': smartRestEnabled,
         'experimentalHeatMapEnabled': experimentalHeatMapEnabled,
         'userProfile': userProfile?.toJson(),
+        'fitnessGoals': fitnessGoals.map((g) => g.toJson()).toList(),
       };
 }
 
@@ -1947,6 +2019,197 @@ class MuscleHeatData {
     if (intensity < 1.2) return 0xFF4CAF50; // Green - optimal
     if (intensity < 1.8) return 0xFFFF9800; // Orange - high
     return 0xFFF44336; // Red - very high
+  }
+}
+
+/// A fitness goal with milestones.
+class FitnessGoal {
+  const FitnessGoal({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.category,
+    required this.milestones,
+    required this.createdAt,
+    this.targetDate,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final GoalCategory category;
+  final List<GoalMilestone> milestones;
+  final DateTime createdAt;
+  final DateTime? targetDate;
+
+  factory FitnessGoal.fromJson(Map<String, Object?> json) {
+    final rawMilestones = (json['milestones'] as List<dynamic>? ?? const []);
+    return FitnessGoal(
+      id: (json['id'] as String?) ?? '',
+      title: (json['title'] as String?) ?? 'Goal',
+      description: (json['description'] as String?) ?? '',
+      category: GoalCategoryX.fromString((json['category'] as String?) ?? 'strength'),
+      milestones: rawMilestones
+          .whereType<Map<String, Object?>>()
+          .map(GoalMilestone.fromJson)
+          .toList(),
+      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ?? DateTime.now(),
+      targetDate: json['targetDate'] != null 
+          ? DateTime.tryParse((json['targetDate'] as String?) ?? '')
+          : null,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'title': title,
+        'description': description,
+        'category': category.name,
+        'milestones': milestones.map((m) => m.toJson()).toList(),
+        'createdAt': createdAt.toIso8601String(),
+        'targetDate': targetDate?.toIso8601String(),
+      };
+
+  FitnessGoal copyWith({
+    String? title,
+    String? description,
+    GoalCategory? category,
+    List<GoalMilestone>? milestones,
+    DateTime? targetDate,
+  }) {
+    return FitnessGoal(
+      id: id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      milestones: milestones ?? this.milestones,
+      createdAt: createdAt,
+      targetDate: targetDate ?? this.targetDate,
+    );
+  }
+}
+
+/// A milestone within a fitness goal.
+class GoalMilestone {
+  const GoalMilestone({
+    required this.title,
+    required this.targetValue,
+    required this.unit,
+    required this.isCompleted,
+    this.completedAt,
+  });
+
+  final String title;
+  final double targetValue;
+  final String unit;
+  final bool isCompleted;
+  final DateTime? completedAt;
+
+  factory GoalMilestone.fromJson(Map<String, Object?> json) {
+    return GoalMilestone(
+      title: (json['title'] as String?) ?? '',
+      targetValue: (json['targetValue'] as num?)?.toDouble() ?? 0,
+      unit: (json['unit'] as String?) ?? '',
+      isCompleted: (json['isCompleted'] as bool?) ?? false,
+      completedAt: json['completedAt'] != null
+          ? DateTime.tryParse((json['completedAt'] as String?) ?? '')
+          : null,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'title': title,
+        'targetValue': targetValue,
+        'unit': unit,
+        'isCompleted': isCompleted,
+        'completedAt': completedAt?.toIso8601String(),
+      };
+
+  GoalMilestone copyWith({
+    String? title,
+    double? targetValue,
+    String? unit,
+    bool? isCompleted,
+    DateTime? completedAt,
+  }) {
+    return GoalMilestone(
+      title: title ?? this.title,
+      targetValue: targetValue ?? this.targetValue,
+      unit: unit ?? this.unit,
+      isCompleted: isCompleted ?? this.isCompleted,
+      completedAt: completedAt,
+    );
+  }
+}
+
+/// Categories for fitness goals.
+enum GoalCategory {
+  strength,
+  endurance,
+  weightLoss,
+  muscleGain,
+  flexibility,
+  consistency,
+  custom,
+}
+
+extension GoalCategoryX on GoalCategory {
+  static GoalCategory fromString(String raw) {
+    switch (raw) {
+      case 'endurance':
+        return GoalCategory.endurance;
+      case 'weightLoss':
+        return GoalCategory.weightLoss;
+      case 'muscleGain':
+        return GoalCategory.muscleGain;
+      case 'flexibility':
+        return GoalCategory.flexibility;
+      case 'consistency':
+        return GoalCategory.consistency;
+      case 'custom':
+        return GoalCategory.custom;
+      case 'strength':
+      default:
+        return GoalCategory.strength;
+    }
+  }
+
+  String get displayName {
+    switch (this) {
+      case GoalCategory.strength:
+        return 'Strength';
+      case GoalCategory.endurance:
+        return 'Endurance';
+      case GoalCategory.weightLoss:
+        return 'Weight Loss';
+      case GoalCategory.muscleGain:
+        return 'Muscle Gain';
+      case GoalCategory.flexibility:
+        return 'Flexibility';
+      case GoalCategory.consistency:
+        return 'Consistency';
+      case GoalCategory.custom:
+        return 'Custom';
+    }
+  }
+
+  int get iconCodePoint {
+    switch (this) {
+      case GoalCategory.strength:
+        return 0xe1e1; // fitness_center
+      case GoalCategory.endurance:
+        return 0xe566; // directions_run
+      case GoalCategory.weightLoss:
+        return 0xe8cb; // trending_down
+      case GoalCategory.muscleGain:
+        return 0xe8e5; // trending_up
+      case GoalCategory.flexibility:
+        return 0xe90f; // self_improvement
+      case GoalCategory.consistency:
+        return 0xe614; // event_repeat
+      case GoalCategory.custom:
+        return 0xe838; // flag
+    }
   }
 }
 

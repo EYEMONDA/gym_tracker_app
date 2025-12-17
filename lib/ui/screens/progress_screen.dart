@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../state/app_state.dart';
+import 'goals_screen.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -135,6 +136,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
           ),
           const SizedBox(height: 14),
+          _GoalsCard(app: app),
+          const SizedBox(height: 14),
           _Card(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -260,6 +263,119 @@ class _Card extends StatelessWidget {
         border: Border.all(color: const Color(0x22FFFFFF)),
       ),
       child: child,
+    );
+  }
+}
+
+class _GoalsCard extends StatelessWidget {
+  const _GoalsCard({required this.app});
+
+  final AppState app;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeGoals = app.activeGoals;
+    final hasGoals = app.fitnessGoals.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF070707),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x22FFFFFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('Goals & Achievements', style: TextStyle(fontWeight: FontWeight.w900)),
+              const Spacer(),
+              if (hasGoals)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C7CFF).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${activeGoals.length} active',
+                    style: const TextStyle(
+                      color: Color(0xFF7C7CFF),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (!hasGoals)
+            const Text(
+              'Set fitness goals with milestones to track your journey.',
+              style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 13),
+            )
+          else
+            ...activeGoals.take(2).map((goal) {
+              final progress = app.getGoalProgress(goal);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            goal.title,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 4,
+                              backgroundColor: const Color(0x22FFFFFF),
+                              color: const Color(0xFF7C7CFF),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: const TextStyle(
+                        color: Color(0xAAFFFFFF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const GoalsScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.flag_outlined, size: 18),
+                  label: Text(hasGoals ? 'View Goals' : 'Set Goals'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

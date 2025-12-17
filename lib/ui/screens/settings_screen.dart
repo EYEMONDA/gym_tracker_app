@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import 'map_routes_screen.dart';
+import 'muscle_heat_map_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -318,6 +319,40 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 : null,
                             icon: const Icon(Icons.map_outlined),
                             label: const Text('Open Map'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Muscle Heat Map (experimental)', style: TextStyle(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Visualize muscle fatigue and training volume. Compare your strength to average lifters with similar profile.',
+                            style: TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                          const SizedBox(height: 10),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: app.experimentalHeatMapEnabled,
+                            onChanged: (v) => app.setExperimentalHeatMapEnabled(v),
+                            title: const Text('Enable Heat Map'),
+                            subtitle: const Text('Track muscle recovery & progress.'),
+                          ),
+                          const SizedBox(height: 10),
+                          FilledButton.tonalIcon(
+                            onPressed: app.experimentalHeatMapEnabled
+                                ? () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (_) => const MuscleHeatMapScreen()),
+                                    );
+                                  }
+                                : null,
+                            icon: const Icon(Icons.local_fire_department_outlined),
+                            label: const Text('Open Heat Map'),
                           ),
                         ],
                       ),
