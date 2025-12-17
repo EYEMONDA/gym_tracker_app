@@ -1,0 +1,91 @@
+Gym Tracker — Product Description (No Login, Web-First)
+
+Overview
+Gym Tracker is a web-based fitness tracker designed to be converted into a cross‑platform native app later (iOS/Android/Desktop) with minimal rework. It intentionally has NO login and stores everything locally.
+
+Core Features Implemented
+- Dynamic-Island-inspired top UI
+  - A centered “pill” overlay at the top of the screen.
+  - Tap to expand into a smart search panel.
+  - Shows an always-available rest timer in compact mode.
+
+- Workout tracker (live session)
+  - Start a workout session.
+  - Add exercises.
+  - Add sets (reps + weight + unit).
+  - Automatically starts a rest timer after adding a set.
+  - Save workout to local history.
+
+- Workout logger / history
+  - List saved sessions.
+  - Open a session detail view showing exercises and sets.
+
+- Calendar
+  - Pick a date and view sessions logged on that day.
+
+- Smart schedule (lightweight)
+  - Suggests the next workout day based on:
+    - your preferred training days (Mon–Sun toggles)
+    - your most recent workout
+
+- Smart ID ("Smart encryption ID")
+  - A local, privacy-preserving identifier generated randomly and stored locally.
+  - Used as an offline “identity anchor” without accounts.
+  - Can be copied/regenerated in Settings.
+
+Design Goals
+- Web-first but native-ready: build once, ship everywhere.
+- No account friction: immediate use, fully offline.
+- Dark/black theme: optimized for gym environments and OLED screens.
+- Fast interaction: Dynamic Island overlay keeps search + timers always reachable.
+
+What was used (and why)
+- Flutter (UI framework)
+  - Why: One codebase for web + iOS + Android + desktop.
+  - Why: Rapid UI iteration and strong component model.
+
+- Material 3 + custom dark theme
+  - Why: Modern UI foundations and accessibility defaults.
+  - Why: We force a black/dark palette to match the requested aesthetic.
+
+- SharedPreferences (local persistence)
+  - Why: Simple, reliable storage for an offline-first prototype.
+  - How: The app persists a small JSON “database” blob with sessions and preferences.
+
+- A simple local data model (JSON)
+  - Why: Enables richer data than a list of strings (sessions → exercises → sets).
+  - Why: Keeps future migration paths open (export/import, syncing, analytics).
+
+- Smart schedule logic (rule-based)
+  - Why: No backend, no ML required.
+  - Why: Still provides helpful suggestions based on behavior.
+
+- Smart search (in the Dynamic Island)
+  - Why: Quickly add exercises from past sessions; fast navigation.
+  - How: Searches across recent sessions + the active session.
+
+Where things live in the code
+- App entry/theme: lib/main.dart
+- App state + persistence + Smart ID: lib/state/app_state.dart
+- Tab shell + overlay: lib/ui/root_shell.dart
+- Dynamic Island: lib/ui/widgets/dynamic_island.dart
+- Screens:
+  - Workout: lib/ui/screens/workout_screen.dart
+  - Log: lib/ui/screens/log_screen.dart
+  - Calendar: lib/ui/screens/calendar_screen.dart
+  - Schedule: lib/ui/screens/schedule_screen.dart
+  - Settings: lib/ui/screens/settings_screen.dart
+
+Current limitations (intentional for v1)
+- No cloud sync and no login.
+- No export/import yet (recommended next if you want device-to-device portability).
+- Encryption is not end-to-end yet; the Smart ID is an offline identifier, not encrypted storage.
+
+Recommended next upgrades
+- Export/import (encrypted) using the Smart ID as a key-derivation seed.
+- Templates (workout plans) + quick-add.
+- Better calendar markers (dots on days with workouts).
+- More advanced “smart schedule” (splits like PPL, Full Body, Upper/Lower).
+
+Update policy
+- Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.
