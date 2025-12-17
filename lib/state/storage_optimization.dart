@@ -1,168 +1,234 @@
-/// Storage optimization strategies for the Gym Tracker app.
+/// Storage optimization for Gym Tracker.
 /// 
-/// This file documents and implements storage reduction techniques.
+/// Implements compact JSON keys and compression to reduce storage by ~80%.
 /// 
-/// ## Current vs Optimized JSON
-/// 
-/// ### Before (verbose keys):
-/// ```json
-/// {
-///   "sessions": [{
-///     "id": "abc123",
-///     "title": "Push Day",
-///     "startedAt": "2024-01-15T10:30:00.000Z",
-///     "endedAt": "2024-01-15T11:45:00.000Z",
-///     "exercises": [{
-///       "name": "Bench Press",
-///       "sets": [{"reps": 10, "weight": 60.0, "unit": "kg", "rpe": 8}]
-///     }]
-///   }]
-/// }
-/// ```
-/// 
-/// ### After (compact keys):
-/// ```json
-/// {
-///   "s": [{
-///     "i": "abc123",
-///     "t": "Push Day",
-///     "a": 1705315800000,
-///     "b": 1705320300000,
-///     "e": [{
-///       "n": "Bench Press",
-///       "s": [{"r": 10, "w": 60.0, "u": 0, "p": 8}]
-///     }]
-///   }]
-/// }
-/// ```
-/// 
-/// ## Size Comparison (100 workout sessions, ~500 sets each)
-/// 
-/// | Format | Size | Notes |
-/// |--------|------|-------|
-/// | Current JSON | ~500 KB | Verbose keys, ISO dates |
-/// | Compact JSON | ~300 KB | Short keys, timestamps |
-/// | MessagePack | ~200 KB | Binary JSON-like |
-/// | Protocol Buffers | ~150 KB | Schema-based binary |
-/// | Compressed JSON (gzip) | ~80 KB | Any JSON + compression |
-/// 
-/// ## Recommendation
-/// 
-/// For this app, **Compact JSON + Compression** is the best tradeoff:
-/// - Easy to implement (no new dependencies)
-/// - Still human-debuggable
-/// - ~85% size reduction
-/// - Works on all platforms (web, mobile)
+/// ## Migration Strategy
+/// - Reading: Supports both old (verbose) and new (compact) keys
+/// - Writing: Always uses compact keys
+/// - Compression: Applied on mobile, skipped on web (dart:io not available)
 library;
 
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
-/// Compact key mappings for JSON optimization.
+// Conditionally import dart:io for compression
+import 'compression_stub.dart'
+    if (dart.library.io) 'compression_io.dart' as compression;
+
+/// Compact key mappings for JSON storage optimization.
 /// 
-/// Using single-character keys reduces JSON size by ~30%.
-abstract final class CompactKeys {
-  // Top-level
+/// Reduces JSON size by ~40% through shorter keys.
+/// 
+/// Format: verbose key -> compact key
+abstract final class K {
+  // ============ AppDb (top-level) ============
   static const sessions = 's';
   static const routineTemplates = 'rt';
   static const plannedWorkouts = 'pw';
   static const mapRoutes = 'mr';
+  static const routeActivityLogs = 'rl';
   static const fitnessGoals = 'fg';
   static const userProfile = 'up';
   static const unlockedAchievements = 'ua';
-  
-  // WorkoutSession
+  static const defaultRestSeconds = 'dr';
+  static const focusModeEnabled = 'fm';
+  static const tapAssistEnabled = 'ta';
+  static const experimentalMapEnabled = 'em';
+  static const experimentalHeatMapEnabled = 'eh';
+  static const weeklyWorkoutGoal = 'wg';
+  static const preferredWeekdays = 'pd';
+  static const supersetModeEnabled = 'sm';
+  static const smartRestEnabled = 'sr';
+  static const restTimerAlertsEnabled = 'ra';
+
+  // ============ WorkoutSession ============
   static const id = 'i';
   static const title = 't';
-  static const startedAt = 'a';  // "at"
-  static const endedAt = 'b';    // "before" (end)
+  static const startedAt = 'a';
+  static const endedAt = 'b';
   static const exercises = 'e';
   static const notes = 'n';
-  
-  // ExerciseEntry
+
+  // ============ ExerciseEntry ============
   static const name = 'n';
   static const sets = 's';
-  
-  // ExerciseSet
+
+  // ============ ExerciseSet ============
   static const reps = 'r';
   static const weight = 'w';
   static const unit = 'u';
   static const rpe = 'p';
-  
-  // Unit enum values (instead of strings)
-  static const unitKg = 0;
-  static const unitLb = 1;
-  static const unitBw = 2;
+
+  // ============ RoutineTemplate ============
+  static const exerciseTemplates = 'et';
+  static const defaultSets = 'ds';
+  static const defaultReps = 'de';
+  static const defaultWeight = 'dw';
+
+  // ============ PlannedWorkout ============
+  static const templateId = 'ti';
+  static const date = 'd';
+  static const status = 'st';
+  static const completedSessionId = 'cs';
+
+  // ============ MapRoute ============
+  static const points = 'pt';
+  static const lat = 'la';
+  static const lng = 'lo';
+  static const distanceMeters = 'dm';
+  static const color = 'c';
+
+  // ============ RouteActivityLog ============
+  static const routeId = 'ri';
+  static const durationSeconds = 'ds';
+
+  // ============ UserProfile ============
+  static const age = 'ag';
+  static const weightKg = 'wk';
+  static const heightCm = 'hc';
+  static const gender = 'g';
+
+  // ============ FitnessGoal ============
+  static const description = 'dc';
+  static const category = 'ca';
+  static const milestones = 'ms';
+  static const createdAt = 'cr';
+  static const targetDate = 'td';
+
+  // ============ GoalMilestone ============
+  static const targetValue = 'tv';
+  static const isCompleted = 'ic';
+  static const completedAt = 'co';
 }
 
-/// Compress a JSON string using gzip.
+/// Unit string to int mapping for compact storage.
 /// 
-/// Typically achieves 70-85% compression on JSON data.
-/// 
-/// Note: Not available on web without additional packages.
-Uint8List? compressJson(String json) {
-  try {
-    final bytes = utf8.encode(json);
-    return Uint8List.fromList(gzip.encode(bytes));
-  } catch (_) {
-    return null; // Compression not available (e.g., web)
+/// Saves ~2 bytes per set (3000 sets = 6KB savings).
+abstract final class UnitCode {
+  static const kg = 0;
+  static const lb = 1;
+  static const bw = 2;
+
+  static int encode(String unit) {
+    switch (unit) {
+      case 'lb':
+        return lb;
+      case 'bw':
+        return bw;
+      case 'kg':
+      default:
+        return kg;
+    }
+  }
+
+  static String decode(Object? code) {
+    switch (code) {
+      case 1:
+      case 'lb':
+        return 'lb';
+      case 2:
+      case 'bw':
+        return 'bw';
+      case 0:
+      case 'kg':
+      default:
+        return 'kg';
+    }
   }
 }
 
-/// Decompress gzip data back to JSON string.
-String? decompressJson(Uint8List compressed) {
-  try {
-    final bytes = gzip.decode(compressed);
-    return utf8.decode(bytes);
-  } catch (_) {
-    return null;
+/// Status codes for PlannedWorkout.
+abstract final class StatusCode {
+  static const planned = 0;
+  static const skipped = 1;
+  static const done = 2;
+
+  static int encode(String status) {
+    switch (status) {
+      case 'skipped':
+        return skipped;
+      case 'done':
+        return done;
+      case 'planned':
+      default:
+        return planned;
+    }
+  }
+
+  static String decode(Object? code) {
+    switch (code) {
+      case 1:
+      case 'skipped':
+        return 'skipped';
+      case 2:
+      case 'done':
+        return 'done';
+      case 0:
+      case 'planned':
+      default:
+        return 'planned';
+    }
   }
 }
 
-/// Estimate storage size for a workout history.
+/// Read a value supporting both old (verbose) and new (compact) keys.
 /// 
-/// Returns estimated bytes for different storage formats.
+/// Example:
+/// ```dart
+/// final title = readKey(json, K.title, 'title') as String?;
+/// ```
+T? readKey<T>(Map<String, Object?> json, String compactKey, String verboseKey) {
+  return (json[compactKey] ?? json[verboseKey]) as T?;
+}
+
+/// Parse DateTime from either ISO string or milliseconds timestamp.
+/// 
+/// Compact format uses milliseconds (smaller), verbose uses ISO string.
+DateTime? parseDateTime(Object? value) {
+  if (value == null) return null;
+  if (value is int) return DateTime.fromMillisecondsSinceEpoch(value);
+  if (value is String) return DateTime.tryParse(value);
+  return null;
+}
+
+/// Encode DateTime as milliseconds timestamp (compact).
+int? encodeDateTime(DateTime? dt) => dt?.millisecondsSinceEpoch;
+
+/// Compress JSON string to bytes (mobile only).
+/// 
+/// Returns null on web or if compression fails.
+Uint8List? compressString(String data) => compression.compress(data);
+
+/// Decompress bytes back to JSON string.
+/// 
+/// Returns null on web or if decompression fails.
+String? decompressToString(Uint8List data) => compression.decompress(data);
+
+/// Check if compression is available on this platform.
+bool get isCompressionAvailable => compression.isAvailable;
+
+/// Storage format version for migration support.
+const int storageVersion = 2;
+
+/// Estimate storage size reduction.
+/// 
+/// Returns a map with estimated bytes for different scenarios.
 Map<String, int> estimateStorageSize({
   required int sessionCount,
-  required int avgExercisesPerSession,
-  required int avgSetsPerExercise,
+  required int exercisesPerSession,
+  required int setsPerExercise,
 }) {
-  // Average bytes per set in different formats
-  const bytesPerSetJson = 50;        // {"reps":10,"weight":60.0,"unit":"kg","rpe":8}
-  const bytesPerSetCompact = 25;     // {"r":10,"w":60,"u":0,"p":8}
-  const bytesPerSetBinary = 10;      // varint + float32 + byte + byte
+  final totalSets = sessionCount * exercisesPerSession * setsPerExercise;
   
-  // Overhead per exercise
-  const exerciseOverheadJson = 30;   // {"name":"...","sets":[]}
-  const exerciseOverheadCompact = 15;
-  const exerciseOverheadBinary = 8;
-  
-  // Overhead per session
-  const sessionOverheadJson = 150;   // id, title, dates, etc.
-  const sessionOverheadCompact = 60;
-  const sessionOverheadBinary = 30;
-  
-  final totalSets = sessionCount * avgExercisesPerSession * avgSetsPerExercise;
-  final totalExercises = sessionCount * avgExercisesPerSession;
-  
-  final jsonSize = (totalSets * bytesPerSetJson) +
-      (totalExercises * exerciseOverheadJson) +
-      (sessionCount * sessionOverheadJson);
-  
-  final compactSize = (totalSets * bytesPerSetCompact) +
-      (totalExercises * exerciseOverheadCompact) +
-      (sessionCount * sessionOverheadCompact);
-  
-  final binarySize = (totalSets * bytesPerSetBinary) +
-      (totalExercises * exerciseOverheadBinary) +
-      (sessionCount * sessionOverheadBinary);
+  // Bytes per component in different formats
+  final verboseJson = totalSets * 55 + sessionCount * 180;
+  final compactJson = totalSets * 25 + sessionCount * 70;
+  final compactGzip = (compactJson * 0.25).round();
   
   return {
-    'json': jsonSize,
-    'compactJson': compactSize,
-    'compactJsonGzip': (compactSize * 0.25).round(), // ~75% compression
-    'binary': binarySize,
-    'binaryGzip': (binarySize * 0.6).round(), // Binary compresses less
+    'verboseJson': verboseJson,
+    'compactJson': compactJson,
+    'compactGzip': compactGzip,
+    'savingsPercent': ((1 - compactGzip / verboseJson) * 100).round(),
   };
 }
