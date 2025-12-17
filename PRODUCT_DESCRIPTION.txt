@@ -157,6 +157,8 @@ Where things live in the code
   - Strength comparison logic (vs average lifters)
   - Fitness goals with milestones
   - User profile for comparisons
+  - Achievement definitions and unlock logic
+  - Rest timer vibration alerts
 - Tab shell + overlay: lib/ui/root_shell.dart
 - Dynamic Island: lib/ui/widgets/dynamic_island.dart
   - Gesture detection
@@ -173,13 +175,14 @@ Where things live in the code
   - Schedule: lib/ui/screens/schedule_screen.dart
   - Settings: lib/ui/screens/settings_screen.dart
     - Smart rest toggle
+    - Timer alerts toggle (vibration)
     - Superset mode toggle
     - Experimental features (Map, Heat Map)
   - Progress: lib/ui/screens/progress_screen.dart
     - Goals card with quick access
   - Goals & Achievements: lib/ui/screens/goals_screen.dart
     - Goals tab with milestone tracking
-    - Achievements tab (placeholder)
+    - Achievements tab with unlock progress and golden styling
   - Muscle Heat Map: lib/ui/screens/muscle_heat_map_screen.dart
     - Fatigue view
     - Volume view
@@ -199,8 +202,8 @@ Recommended next upgrades
 - Watch integration (Apple Watch / Wear OS).
 - ✅ Exercise library with muscle group tagging (implemented in Heat Map).
 - ✅ Volume tracking (sets × reps × weight per muscle group) (implemented in Heat Map).
-- Rest timer sound/vibration alerts.
-- Achievement unlocking logic (currently placeholder).
+- ✅ Rest timer vibration alerts (implemented — double haptic pulse when timer ends).
+- ✅ Achievement unlocking logic (implemented — 12 achievements with auto-unlock + progress tracking).
 - Social features (share progress, compare with friends).
 - Workout templates from AI suggestions.
 
@@ -226,7 +229,15 @@ Latest Update — Muscle Heat Map & Goals:
     - Multiple goal categories (strength, endurance, weight loss, etc.).
     - Milestone completion tracking with checkboxes.
     - Progress visualization on goal cards.
-12. Achievements (Placeholder) — Grid of achievement badges (coming soon).
+12. Achievements — Fully functional achievement system.
+    - 12 unique achievements (First Workout, Week Warrior, Streak Master, Century Club, etc.).
+    - Auto-unlock when conditions are met (checked after each workout).
+    - Progress tracking with percentage display for locked achievements.
+    - Visual progress ring around locked achievement icons.
+    - Golden glow and styling for unlocked achievements.
+13. Rest Timer Alerts — Vibration feedback when timer completes.
+    - Double haptic pulse for attention.
+    - Configurable on/off in Settings.
 
 Update policy
 - Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.

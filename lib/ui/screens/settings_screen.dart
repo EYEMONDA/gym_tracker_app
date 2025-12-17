@@ -187,6 +187,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             title: const Text('Enable Smart Rest'),
                             subtitle: const Text('Compound: 2:30 • Isolation: 1:15'),
                           ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: app.restTimerAlertsEnabled,
+                            onChanged: (v) => app.setRestTimerAlertsEnabled(v),
+                            title: const Text('Timer Alerts'),
+                            subtitle: const Text('Vibrate when rest timer completes'),
+                          ),
                           const SizedBox(height: 10),
                           const Text('Default rest timer (when Smart Rest is off)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                           const SizedBox(height: 6),
