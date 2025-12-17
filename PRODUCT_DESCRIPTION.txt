@@ -16,7 +16,7 @@ Core Features Implemented
   - Start a workout session.
   - Add exercises.
   - Add sets (reps + weight + unit + optional RPE).
-  - Automatically starts a rest timer after adding a set.
+  - Automatically starts a rest timer after logging/completing a set.
   - Save workout to local history.
 
 - Workout logger / history
