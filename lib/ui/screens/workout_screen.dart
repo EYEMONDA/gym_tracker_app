@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 
@@ -96,6 +97,7 @@ class WorkoutScreen extends StatelessWidget {
                       reps: result.reps,
                       weight: result.weight,
                       unit: result.unit,
+                      rpe: result.rpe,
                     );
                     app.startRestTimer();
                   },
@@ -273,7 +275,14 @@ class _ExerciseCard extends StatelessWidget {
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 title: Text('Set ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${s.reps} reps • ${s.weight.toStringAsFixed(s.weight == s.weight.roundToDouble() ? 0 : 1)} ${s.unit}'),
+                subtitle: Text(() {
+                  final w = s.weight.toStringAsFixed(s.weight == s.weight.roundToDouble() ? 0 : 1);
+                  final rpe = s.rpe;
+                  final rpeText = rpe == null
+                      ? ''
+                      : ' • RPE ${rpe.toStringAsFixed(rpe == rpe.roundToDouble() ? 0 : 1)}';
+                  return '${s.reps} reps • $w ${s.unit}$rpeText';
+                }()),
                 trailing: IconButton(
                   tooltip: 'Remove set',
                   icon: const Icon(Icons.delete_outline, size: 18),
@@ -399,12 +408,21 @@ class _AddSetDialog extends StatefulWidget {
 class _AddSetDialogState extends State<_AddSetDialog> {
   final TextEditingController _reps = TextEditingController(text: '10');
   final TextEditingController _weight = TextEditingController(text: '0');
+  final TextEditingController _rpe = TextEditingController();
   String _unit = 'kg';
+
+  final FocusNode _repsFocus = FocusNode();
+  final FocusNode _weightFocus = FocusNode();
+  final FocusNode _rpeFocus = FocusNode();
 
   @override
   void dispose() {
     _reps.dispose();
     _weight.dispose();
+    _rpe.dispose();
+    _repsFocus.dispose();
+    _weightFocus.dispose();
+    _rpeFocus.dispose();
     super.dispose();
   }
 
@@ -417,13 +435,40 @@ class _AddSetDialogState extends State<_AddSetDialog> {
         children: [
           TextField(
             controller: _reps,
+            focusNode: _repsFocus,
             keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
             decoration: const InputDecoration(labelText: 'Reps'),
+            onSubmitted: (_) => _weightFocus.requestFocus(),
           ),
           TextField(
             controller: _weight,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            focusNode: _weightFocus,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
+            textInputAction: TextInputAction.next,
+            // Prevent symbols like "#" from being entered at all.
+            // Allow digits plus one decimal separator (dot or comma).
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^[0-9]*[.,]?[0-9]{0,2}$')),
+              LengthLimitingTextInputFormatter(7),
+            ],
             decoration: const InputDecoration(labelText: 'Weight'),
+            onSubmitted: (_) => _rpeFocus.requestFocus(),
+          ),
+          TextField(
+            controller: _rpe,
+            focusNode: _rpeFocus,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
+            textInputAction: TextInputAction.done,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^[0-9]*[.,]?[0-9]{0,1}$')),
+              LengthLimitingTextInputFormatter(4),
+            ],
+            decoration: const InputDecoration(labelText: 'RPE (optional, 1–10)'),
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
@@ -443,8 +488,18 @@ class _AddSetDialogState extends State<_AddSetDialog> {
         FilledButton(
           onPressed: () {
             final reps = int.tryParse(_reps.text.trim()) ?? 10;
-            final w = double.tryParse(_weight.text.trim()) ?? 0;
-            Navigator.pop(context, _SetDraft(reps: reps.clamp(1, 999), weight: w, unit: _unit));
+            final w = double.tryParse(_weight.text.trim().replaceAll(',', '.')) ?? 0;
+            final rpeRaw = _rpe.text.trim();
+            final rpe = rpeRaw.isEmpty ? null : double.tryParse(rpeRaw.replaceAll(',', '.'));
+            Navigator.pop(
+              context,
+              _SetDraft(
+                reps: reps.clamp(1, 999),
+                weight: w,
+                unit: _unit,
+                rpe: rpe == null ? null : rpe.clamp(1, 10),
+              ),
+            );
           },
           child: const Text('Add'),
         ),
@@ -454,9 +509,10 @@ class _AddSetDialogState extends State<_AddSetDialog> {
 }
 
 class _SetDraft {
-  const _SetDraft({required this.reps, required this.weight, required this.unit});
+  const _SetDraft({required this.reps, required this.weight, required this.unit, required this.rpe});
   final int reps;
   final double weight;
   final String unit;
+  final double? rpe;
 }
 
