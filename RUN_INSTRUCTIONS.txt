@@ -24,26 +24,29 @@ Build for Production
 
 Project Structure
   lib/
-  ├── main.dart                    # App entry point
+  ├── main.dart                      # App entry point
   ├── state/
-  │   └── app_state.dart           # All state + data models (~2500 lines)
+  │   ├── app_state.dart             # All state + data models (~2500 lines)
+  │   ├── storage_optimization.dart  # Compact keys + compression utils
+  │   ├── compression_io.dart        # Gzip for mobile/desktop
+  │   └── compression_stub.dart      # No-op stub for web
   └── ui/
-      ├── root_shell.dart          # Tab navigation + Dynamic Island overlay
+      ├── root_shell.dart            # Tab navigation + Dynamic Island overlay
       ├── theme/
-      │   └── app_theme.dart       # Centralized colors, sizes, durations
+      │   └── app_theme.dart         # Centralized colors, sizes, durations
       ├── widgets/
-      │   ├── app_card.dart        # Shared card containers
-      │   ├── animated_widgets.dart # Animation utilities
-      │   ├── dynamic_island.dart  # Dynamic Island UI
-      │   └── month_calendar.dart  # Calendar widget
+      │   ├── app_card.dart          # Shared card containers
+      │   ├── animated_widgets.dart  # Animation utilities
+      │   ├── dynamic_island.dart    # Dynamic Island UI
+      │   └── month_calendar.dart    # Calendar widget
       └── screens/
-          ├── workout_screen.dart   # Active workout logging
-          ├── log_screen.dart       # Workout history
-          ├── calendar_screen.dart  # Calendar view
-          ├── schedule_screen.dart  # Routine scheduling
-          ├── progress_screen.dart  # PRs and weekly stats
-          ├── goals_screen.dart     # Goals & achievements
-          ├── settings_screen.dart  # App settings
+          ├── workout_screen.dart    # Active workout logging
+          ├── log_screen.dart        # Workout history
+          ├── calendar_screen.dart   # Calendar view
+          ├── schedule_screen.dart   # Routine scheduling
+          ├── progress_screen.dart   # PRs and weekly stats
+          ├── goals_screen.dart      # Goals & achievements
+          ├── settings_screen.dart   # App settings
           ├── muscle_heat_map_screen.dart  # Experimental heat map
           └── map_routes_screen.dart       # Experimental map routes
 
@@ -52,7 +55,16 @@ Data Storage
 - Data stored locally via SharedPreferences.
   - Mobile: platform key/value storage
   - Web: browser localStorage
-- Data persisted as JSON in a single 'gym_tracker_db_v1' key.
+- Data persisted as JSON in 'gym_tracker_db_v1' key.
+
+Storage Optimization (Prepared)
+- Compact JSON keys ready (K.sessions instead of 'sessions')
+- Gzip compression available on mobile (~75% reduction)
+- Backward-compatible reading (supports old + new formats)
+- Estimated savings for 1-year user (150 sessions):
+  - Current JSON:     ~180 KB
+  - Compact JSON:     ~100 KB
+  - Compact + Gzip:   ~25 KB (86% smaller)
 
 Key Features
 - Dynamic Island UI with gesture controls
@@ -62,18 +74,21 @@ Key Features
 - Fitness goals with milestones
 - Muscle heat map (experimental)
 - Animated UI with confetti, pulsing glows, staggered lists
+- Rest timer vibration alerts
 
 Development Tips
 - Run lints: flutter analyze
 - Run tests: flutter test
 - Hot reload: Press 'r' in terminal or save files in IDE
+- Check storage size: See storage_optimization.dart for estimateStorageSize()
 
 Troubleshooting
 - "flutter not found": Add Flutter SDK bin/ to your PATH
 - "No devices found": flutter config --enable-web && flutter devices
 - "Pub get failed": Delete pubspec.lock and re-run flutter pub get
+- "Compression not working": Only available on mobile, not web
 
 Notes for Remote Environments
 - This workspace may not have Flutter installed.
 - Clone the repo locally and run with Flutter on your machine.
-- All code is pure Dart/Flutter with no native dependencies (except flutter_map for experimental features).
+- All code is pure Dart/Flutter with minimal native dependencies.

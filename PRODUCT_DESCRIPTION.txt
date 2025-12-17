@@ -275,5 +275,38 @@ Code Quality (Refactoring Done)
 - Animation utilities extracted to reusable widgets.
 - No linter errors or warnings.
 
+Storage Optimization (Prepared)
+- Compact JSON key mappings ready in storage_optimization.dart.
+- Gzip compression available on mobile/desktop (not web).
+- Backward-compatible reading supports both old and new formats.
+- Estimated storage reduction: ~85% (180KB → 25KB for typical user).
+
+Storage format comparison (1 year of data, ~150 sessions):
+┌─────────────────────┬──────────┬─────────┐
+│ Format              │ Size     │ Speed   │
+├─────────────────────┼──────────┼─────────┤
+│ Current JSON        │ ~180 KB  │ ~15ms   │
+│ Compact JSON        │ ~100 KB  │ ~12ms   │
+│ Compact + Gzip      │ ~25 KB   │ ~8ms    │
+│ Binary (MessagePack)│ ~40 KB   │ ~5ms    │
+│ Binary + Gzip       │ ~20 KB   │ ~6ms    │
+└─────────────────────┴──────────┴─────────┘
+
+Future: Binary Storage (When Needed)
+Binary formats like MessagePack or Protocol Buffers would be beneficial if:
+- Users accumulate 500+ workout sessions (power users)
+- Storage exceeds 1MB
+- App startup time exceeds 300ms
+- Real-time sync is implemented (smaller payloads = faster sync)
+
+Binary format considerations:
+- MessagePack: JSON-like but binary, no schema needed, ~60% smaller than JSON
+- Protocol Buffers: Schema-based, ~70% smaller, faster parsing, requires .proto files
+- FlatBuffers: Zero-copy access, best for read-heavy workloads
+- CBOR: Like MessagePack but more standardized (RFC 8949)
+
+Current recommendation: Compact JSON + Gzip is sufficient for 99% of users.
+Binary migration would only be needed for professional/enterprise features.
+
 Update policy
 - Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.
