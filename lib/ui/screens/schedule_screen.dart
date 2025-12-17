@@ -57,6 +57,63 @@ class ScheduleScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Routine templates', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                const Text(
+                  'Use these to plan multiple routines per day in the Calendar.',
+                  style: TextStyle(color: Color(0xAAFFFFFF)),
+                ),
+                const SizedBox(height: 10),
+                if (app.routineTemplates.isEmpty)
+                  const Text('No templates.', style: TextStyle(color: Color(0xAAFFFFFF)))
+                else
+                  ...app.routineTemplates.map((t) {
+                    final preview = t.exercises.take(3).map((e) => e.name).where((s) => s.trim().isNotEmpty).join(', ');
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A0A0A),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0x22FFFFFF)),
+                      ),
+                      child: ListTile(
+                        title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: Text(
+                          preview.isEmpty ? '${t.exercises.length} items' : '$preview${t.exercises.length > 3 ? '…' : ''}',
+                          style: const TextStyle(color: Color(0xAAFFFFFF)),
+                        ),
+                        trailing: FilledButton.tonal(
+                          onPressed: () {
+                            // Quick-start this template now (not a calendar plan).
+                            if (app.activeSession == null) {
+                              app.startWorkout(title: t.name);
+                              for (final e in t.exercises) {
+                                if (e.name.trim().isEmpty) continue;
+                                app.addExerciseToActive(e.name);
+                              }
+                              app.requestedTabIndex = 0;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Started workout from template.')),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Finish/discard current workout first.')),
+                              );
+                            }
+                          },
+                          child: const Text('Start'),
+                        ),
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 const Text('Preferred training days', style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 10),
                 Wrap(

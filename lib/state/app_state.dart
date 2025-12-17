@@ -24,6 +24,9 @@ class AppState extends ChangeNotifier {
   /// Active workout session (not yet saved).
   WorkoutSessionDraft? activeSession;
 
+  /// If the active session was started from a plan, this links it.
+  String? activePlannedWorkoutId;
+
   /// Focus mode: Dynamic Island becomes a quick logger during workouts.
   bool focusModeEnabled = true;
 
@@ -32,6 +35,15 @@ class AppState extends ChangeNotifier {
 
   /// Saved sessions.
   final List<WorkoutSession> sessions = [];
+
+  /// Routine templates you can schedule repeatedly.
+  final List<RoutineTemplate> routineTemplates = [];
+
+  /// Planned routines on the calendar (can be multiple per day).
+  final List<PlannedWorkout> plannedWorkouts = [];
+
+  /// Used to request a tab switch from deep UI actions (e.g. starting a plan).
+  int? requestedTabIndex;
 
   /// Rest timer state, shown in the Dynamic Island.
   RestTimerState restTimer = RestTimerState.idle();
@@ -75,6 +87,12 @@ class AppState extends ChangeNotifier {
         sessions
           ..clear()
           ..addAll(db.sessions);
+        routineTemplates
+          ..clear()
+          ..addAll(db.routineTemplates);
+        plannedWorkouts
+          ..clear()
+          ..addAll(db.plannedWorkouts);
         defaultRestSeconds = db.defaultRestSeconds;
         focusModeEnabled = db.focusModeEnabled;
         preferredWeekdays
@@ -85,7 +103,13 @@ class AppState extends ChangeNotifier {
       }
     }
 
+    // Seed defaults if the app is brand new.
+    if (routineTemplates.isEmpty) {
+      routineTemplates.addAll(_defaultTemplates());
+    }
+
     _loaded = true;
+    await _persist();
     notifyListeners();
   }
 
@@ -93,6 +117,8 @@ class AppState extends ChangeNotifier {
     final prefs = _prefs ?? await SharedPreferences.getInstance();
     final db = AppDb(
       sessions: sessions,
+      routineTemplates: routineTemplates,
+      plannedWorkouts: plannedWorkouts,
       defaultRestSeconds: defaultRestSeconds,
       focusModeEnabled: focusModeEnabled,
       preferredWeekdays: preferredWeekdays.toList()..sort(),
@@ -118,6 +144,7 @@ class AppState extends ChangeNotifier {
       title: title?.trim().isEmpty ?? true ? 'Workout' : title!.trim(),
     );
     activeExerciseIndex = 0;
+    activePlannedWorkoutId = null;
     notifyListeners();
   }
 
@@ -125,6 +152,7 @@ class AppState extends ChangeNotifier {
     final draft = activeSession;
     if (draft == null) return;
     final endedAt = DateTime.now();
+    final sessionId = draft.id;
     sessions.insert(
       0,
       WorkoutSession(
@@ -136,7 +164,18 @@ class AppState extends ChangeNotifier {
         notes: draft.notes.trim().isEmpty ? null : draft.notes.trim(),
       ),
     );
+    if (activePlannedWorkoutId != null) {
+      final planId = activePlannedWorkoutId!;
+      final idx = plannedWorkouts.indexWhere((p) => p.id == planId);
+      if (idx != -1) {
+        plannedWorkouts[idx] = plannedWorkouts[idx].copyWith(
+          status: PlannedWorkoutStatus.done,
+          completedSessionId: sessionId,
+        );
+      }
+    }
     activeSession = null;
+    activePlannedWorkoutId = null;
     stopRestTimer();
     await _persist();
     notifyListeners();
@@ -144,6 +183,7 @@ class AppState extends ChangeNotifier {
 
   void discardActiveWorkout() {
     activeSession = null;
+    activePlannedWorkoutId = null;
     stopRestTimer();
     activeExerciseIndex = 0;
     notifyListeners();
@@ -316,12 +356,17 @@ class AppState extends ChangeNotifier {
   Future<void> clearLocalData({bool regenerateSmartId = false}) async {
     sessions.clear();
     activeSession = null;
+    activePlannedWorkoutId = null;
     stopRestTimer();
     searchQuery = '';
     isSearchExpanded = false;
     focusModeEnabled = true;
     activeExerciseIndex = 0;
     defaultRestSeconds = 90;
+    routineTemplates
+      ..clear()
+      ..addAll(_defaultTemplates());
+    plannedWorkouts.clear();
     preferredWeekdays
       ..clear()
       ..addAll({1, 3, 5});
@@ -335,6 +380,131 @@ class AppState extends ChangeNotifier {
 
     await _persist();
     notifyListeners();
+  }
+
+  // ---------------------------
+  // Routines / Planning
+  // ---------------------------
+
+  List<RoutineTemplate> _defaultTemplates() {
+    return const [
+      RoutineTemplate(
+        id: 'tpl_full_body',
+        name: 'Full Body',
+        exercises: [
+          RoutineExerciseTemplate(name: 'Squat'),
+          RoutineExerciseTemplate(name: 'Bench Press'),
+          RoutineExerciseTemplate(name: 'Row'),
+          RoutineExerciseTemplate(name: 'Overhead Press'),
+        ],
+      ),
+      RoutineTemplate(
+        id: 'tpl_upper',
+        name: 'Upper',
+        exercises: [
+          RoutineExerciseTemplate(name: 'Bench Press'),
+          RoutineExerciseTemplate(name: 'Pull-up / Lat Pulldown'),
+          RoutineExerciseTemplate(name: 'Incline Press'),
+          RoutineExerciseTemplate(name: 'Row'),
+        ],
+      ),
+      RoutineTemplate(
+        id: 'tpl_lower',
+        name: 'Lower',
+        exercises: [
+          RoutineExerciseTemplate(name: 'Squat'),
+          RoutineExerciseTemplate(name: 'RDL / Deadlift'),
+          RoutineExerciseTemplate(name: 'Leg Press'),
+          RoutineExerciseTemplate(name: 'Calf Raise'),
+        ],
+      ),
+      RoutineTemplate(
+        id: 'tpl_cardio',
+        name: 'Cardio',
+        exercises: [
+          RoutineExerciseTemplate(name: 'Run / Bike / Row'),
+          RoutineExerciseTemplate(name: 'Zone 2 (20–40m)'),
+        ],
+      ),
+      RoutineTemplate(
+        id: 'tpl_mobility',
+        name: 'Mobility',
+        exercises: [
+          RoutineExerciseTemplate(name: 'Warm-up'),
+          RoutineExerciseTemplate(name: 'Stretching'),
+          RoutineExerciseTemplate(name: 'Core'),
+        ],
+      ),
+    ];
+  }
+
+  Future<void> addPlannedWorkout({
+    required DateTime date,
+    required String templateId,
+    String? timeLabel,
+  }) async {
+    final tpl = routineTemplates.where((t) => t.id == templateId).cast<RoutineTemplate?>().firstOrNull;
+    if (tpl == null) return;
+    plannedWorkouts.add(
+      PlannedWorkout(
+        id: _newId(),
+        templateId: templateId,
+        templateNameSnapshot: tpl.name,
+        date: DateTime(date.year, date.month, date.day),
+        timeLabel: timeLabel?.trim().isEmpty ?? true ? null : timeLabel!.trim(),
+        status: PlannedWorkoutStatus.planned,
+        completedSessionId: null,
+      ),
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> removePlannedWorkout(String id) async {
+    plannedWorkouts.removeWhere((p) => p.id == id);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> setPlannedWorkoutStatus(String id, PlannedWorkoutStatus status) async {
+    final idx = plannedWorkouts.indexWhere((p) => p.id == id);
+    if (idx == -1) return;
+    plannedWorkouts[idx] = plannedWorkouts[idx].copyWith(status: status);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Starts a workout from a plan and jumps to the Workout tab.
+  ///
+  /// If a workout is already active, this does nothing.
+  void startPlannedWorkout(String plannedWorkoutId) {
+    if (activeSession != null) return;
+    final plan = plannedWorkouts.where((p) => p.id == plannedWorkoutId).cast<PlannedWorkout?>().firstOrNull;
+    if (plan == null) return;
+    final tpl = routineTemplates.where((t) => t.id == plan.templateId).cast<RoutineTemplate?>().firstOrNull;
+    final title = tpl?.name ?? plan.templateNameSnapshot;
+
+    final draft = WorkoutSessionDraft(
+      id: _newId(),
+      startedAt: DateTime.now(),
+      title: title,
+    );
+    final exercises = (tpl?.exercises ?? const <RoutineExerciseTemplate>[]);
+    for (final e in exercises) {
+      final n = e.name.trim();
+      if (n.isEmpty) continue;
+      draft.exercises.add(ExerciseDraft(name: n));
+    }
+    activeSession = draft;
+    activePlannedWorkoutId = plannedWorkoutId;
+    activeExerciseIndex = 0;
+    requestedTabIndex = 0; // Workout tab
+    isSearchExpanded = false;
+    notifyListeners();
+  }
+
+  void clearRequestedTabIndex() {
+    requestedTabIndex = null;
   }
 
   // ---------------------------
@@ -440,22 +610,36 @@ class AppScope extends InheritedNotifier<AppState> {
 class AppDb {
   const AppDb({
     required this.sessions,
+    required this.routineTemplates,
+    required this.plannedWorkouts,
     required this.defaultRestSeconds,
     required this.focusModeEnabled,
     required this.preferredWeekdays,
   });
 
   final List<WorkoutSession> sessions;
+  final List<RoutineTemplate> routineTemplates;
+  final List<PlannedWorkout> plannedWorkouts;
   final int defaultRestSeconds;
   final bool focusModeEnabled;
   final List<int> preferredWeekdays;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
+    final rawTemplates = (json['routineTemplates'] as List<dynamic>? ?? const []);
+    final rawPlans = (json['plannedWorkouts'] as List<dynamic>? ?? const []);
     return AppDb(
       sessions: rawSessions
           .whereType<Map<String, Object?>>()
           .map(WorkoutSession.fromJson)
+          .toList(),
+      routineTemplates: rawTemplates
+          .whereType<Map<String, Object?>>()
+          .map(RoutineTemplate.fromJson)
+          .toList(),
+      plannedWorkouts: rawPlans
+          .whereType<Map<String, Object?>>()
+          .map(PlannedWorkout.fromJson)
           .toList(),
       defaultRestSeconds: (json['defaultRestSeconds'] as num?)?.toInt() ?? 90,
       focusModeEnabled: (json['focusModeEnabled'] as bool?) ?? true,
@@ -469,6 +653,8 @@ class AppDb {
 
   Map<String, Object?> toJson() => {
         'sessions': sessions.map((s) => s.toJson()).toList(),
+        'routineTemplates': routineTemplates.map((t) => t.toJson()).toList(),
+        'plannedWorkouts': plannedWorkouts.map((p) => p.toJson()).toList(),
         'defaultRestSeconds': defaultRestSeconds,
         'focusModeEnabled': focusModeEnabled,
         'preferredWeekdays': preferredWeekdays,
@@ -651,4 +837,122 @@ class SearchHit {
 }
 
 enum SearchHitKind { exercise, session }
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
+}
+
+class RoutineTemplate {
+  const RoutineTemplate({
+    required this.id,
+    required this.name,
+    required this.exercises,
+  });
+
+  final String id;
+  final String name;
+  final List<RoutineExerciseTemplate> exercises;
+
+  factory RoutineTemplate.fromJson(Map<String, Object?> json) {
+    final raw = (json['exercises'] as List<dynamic>? ?? const []);
+    return RoutineTemplate(
+      id: (json['id'] as String?) ?? '',
+      name: (json['name'] as String?) ?? 'Routine',
+      exercises: raw
+          .whereType<Map<String, Object?>>()
+          .map(RoutineExerciseTemplate.fromJson)
+          .toList(),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'name': name,
+        'exercises': exercises.map((e) => e.toJson()).toList(),
+      };
+}
+
+class RoutineExerciseTemplate {
+  const RoutineExerciseTemplate({required this.name});
+  final String name;
+
+  factory RoutineExerciseTemplate.fromJson(Map<String, Object?> json) {
+    return RoutineExerciseTemplate(name: (json['name'] as String?) ?? '');
+  }
+
+  Map<String, Object?> toJson() => {'name': name};
+}
+
+class PlannedWorkout {
+  const PlannedWorkout({
+    required this.id,
+    required this.templateId,
+    required this.templateNameSnapshot,
+    required this.date,
+    required this.timeLabel,
+    required this.status,
+    required this.completedSessionId,
+  });
+
+  final String id;
+  final String templateId;
+  final String templateNameSnapshot;
+  final DateTime date; // date-only
+  final String? timeLabel; // e.g. "AM", "18:00"
+  final PlannedWorkoutStatus status;
+  final String? completedSessionId;
+
+  factory PlannedWorkout.fromJson(Map<String, Object?> json) {
+    return PlannedWorkout(
+      id: (json['id'] as String?) ?? '',
+      templateId: (json['templateId'] as String?) ?? '',
+      templateNameSnapshot: (json['templateNameSnapshot'] as String?) ?? 'Routine',
+      date: DateTime.tryParse((json['date'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+      timeLabel: (json['timeLabel'] as String?)?.trim().isEmpty ?? true ? null : (json['timeLabel'] as String?)?.trim(),
+      status: PlannedWorkoutStatusX.fromString((json['status'] as String?) ?? 'planned'),
+      completedSessionId: (json['completedSessionId'] as String?),
+    );
+  }
+
+  PlannedWorkout copyWith({
+    PlannedWorkoutStatus? status,
+    String? completedSessionId,
+  }) {
+    return PlannedWorkout(
+      id: id,
+      templateId: templateId,
+      templateNameSnapshot: templateNameSnapshot,
+      date: date,
+      timeLabel: timeLabel,
+      status: status ?? this.status,
+      completedSessionId: completedSessionId ?? this.completedSessionId,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'templateId': templateId,
+        'templateNameSnapshot': templateNameSnapshot,
+        'date': DateTime(date.year, date.month, date.day).toIso8601String(),
+        'timeLabel': timeLabel,
+        'status': status.name,
+        'completedSessionId': completedSessionId,
+      };
+}
+
+enum PlannedWorkoutStatus { planned, done, skipped }
+
+extension PlannedWorkoutStatusX on PlannedWorkoutStatus {
+  static PlannedWorkoutStatus fromString(String raw) {
+    switch (raw) {
+      case 'done':
+        return PlannedWorkoutStatus.done;
+      case 'skipped':
+        return PlannedWorkoutStatus.skipped;
+      case 'planned':
+      default:
+        return PlannedWorkoutStatus.planned;
+    }
+  }
+}
 

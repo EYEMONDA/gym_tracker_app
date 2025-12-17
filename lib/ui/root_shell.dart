@@ -21,6 +21,14 @@ class _RootShellState extends State<RootShell> {
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
+    final requested = app.requestedTabIndex;
+    if (requested != null && requested != _tabIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _tabIndex = requested);
+        app.clearRequestedTabIndex();
+      });
+    }
 
     final tabs = <Widget>[
       const WorkoutScreen(),

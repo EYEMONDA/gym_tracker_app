@@ -23,12 +23,19 @@ Core Features Implemented
   - Open a session detail view showing exercises and sets.
 
 - Calendar
-  - Pick a date and view sessions logged on that day.
+  - Smart month view with markers:
+    - planned routine count per day
+    - completed workout count per day
+  - Tap a day to see:
+    - Planned routines (multiple per day) with Start/Skip/Delete actions
+    - Completed workouts for that day
+  - “Plan” button lets you schedule multiple routines on the same date (with optional time label like AM/PM/18:00).
 
 - Smart schedule (lightweight)
   - Suggests the next workout day based on:
     - your preferred training days (Mon–Sun toggles)
     - your most recent workout
+  - Routine templates can be quick-started (and used for planning via Calendar).
 
 - Smart ID ("Smart encryption ID")
   - A local, privacy-preserving identifier generated randomly and stored locally.
