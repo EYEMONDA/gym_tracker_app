@@ -274,6 +274,8 @@ class AppState extends ChangeNotifier {
           ..addAll(db.routeActivityLogs);
         supersetModeEnabled = db.supersetModeEnabled;
         smartRestEnabled = db.smartRestEnabled;
+        experimentalHeatMapEnabled = db.experimentalHeatMapEnabled;
+        userProfile = db.userProfile;
       } catch (_) {
         // If the DB is corrupt, keep the app usable.
       }
@@ -305,6 +307,8 @@ class AppState extends ChangeNotifier {
       routeActivityLogs: routeActivityLogs,
       supersetModeEnabled: supersetModeEnabled,
       smartRestEnabled: smartRestEnabled,
+      experimentalHeatMapEnabled: experimentalHeatMapEnabled,
+      userProfile: userProfile,
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
   }
@@ -488,6 +492,230 @@ class AppState extends ChangeNotifier {
     experimentalMapEnabled = enabled;
     await _persist();
     notifyListeners();
+  }
+
+  Future<void> setExperimentalHeatMapEnabled(bool enabled) async {
+    if (experimentalHeatMapEnabled == enabled) return;
+    experimentalHeatMapEnabled = enabled;
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> setUserProfile(UserProfile? profile) async {
+    userProfile = profile;
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Get muscle groups targeted by an exercise name.
+  List<MuscleGroup> getMuscleGroups(String exerciseName) {
+    final lower = exerciseName.trim().toLowerCase();
+    // Direct match
+    if (exerciseToMuscles.containsKey(lower)) {
+      return exerciseToMuscles[lower]!;
+    }
+    // Partial match
+    for (final entry in exerciseToMuscles.entries) {
+      if (lower.contains(entry.key) || entry.key.contains(lower)) {
+        return entry.value;
+      }
+    }
+    return [];
+  }
+
+  /// Calculate muscle fatigue/training intensity for each muscle group.
+  /// Returns a map of muscle group to intensity (0.0 - 1.0+).
+  /// Looks at workouts from the past [days] days.
+  Map<MuscleGroup, MuscleHeatData> getMuscleHeatMap({int days = 7}) {
+    final now = DateTime.now();
+    final cutoff = DateTime(now.year, now.month, now.day).subtract(Duration(days: days));
+    
+    // Collect volume per muscle group
+    final volumeByMuscle = <MuscleGroup, double>{};
+    final setsByMuscle = <MuscleGroup, int>{};
+    final bestWeightByMuscle = <MuscleGroup, double>{};
+    final lastWorkedByMuscle = <MuscleGroup, DateTime>{};
+    
+    for (final session in sessions) {
+      if (session.startedAt.isBefore(cutoff)) continue;
+      
+      for (final exercise in session.exercises) {
+        final muscles = getMuscleGroups(exercise.name);
+        if (muscles.isEmpty) continue;
+        
+        for (final set in exercise.sets) {
+          if (set.reps <= 0) continue;
+          // Volume = weight * reps (or just reps for bodyweight)
+          final volume = set.weight > 0 ? set.weight * set.reps : set.reps * 10.0;
+          
+          for (final muscle in muscles) {
+            // Primary muscle gets full credit, secondary muscles get partial
+            final isPrimary = muscle == muscles.first;
+            final credit = isPrimary ? 1.0 : 0.5;
+            
+            volumeByMuscle[muscle] = (volumeByMuscle[muscle] ?? 0) + volume * credit;
+            setsByMuscle[muscle] = (setsByMuscle[muscle] ?? 0) + 1;
+            
+            if (set.weight > (bestWeightByMuscle[muscle] ?? 0)) {
+              bestWeightByMuscle[muscle] = set.weight;
+            }
+            
+            final sessionDate = session.startedAt;
+            if (lastWorkedByMuscle[muscle] == null || 
+                sessionDate.isAfter(lastWorkedByMuscle[muscle]!)) {
+              lastWorkedByMuscle[muscle] = sessionDate;
+            }
+          }
+        }
+      }
+    }
+    
+    // Calculate intensity relative to expected weekly volume
+    // Baseline: ~10 sets per muscle group per week is moderate
+    const baselineSetsPerWeek = 10.0;
+    final result = <MuscleGroup, MuscleHeatData>{};
+    
+    for (final muscle in MuscleGroup.values) {
+      final sets = setsByMuscle[muscle] ?? 0;
+      final volume = volumeByMuscle[muscle] ?? 0;
+      final bestWeight = bestWeightByMuscle[muscle] ?? 0;
+      final lastWorked = lastWorkedByMuscle[muscle];
+      
+      // Intensity based on sets (0.0 = no work, 1.0 = baseline, 2.0 = double baseline)
+      final setsIntensity = sets / baselineSetsPerWeek;
+      
+      // Fatigue decay: muscles recover ~50% per day
+      double fatigue = 0;
+      if (lastWorked != null) {
+        final daysSinceWorked = now.difference(lastWorked).inHours / 24.0;
+        final recoveryFactor = (daysSinceWorked / 2.0).clamp(0.0, 1.0); // Full recovery in ~2 days
+        fatigue = setsIntensity * (1.0 - recoveryFactor);
+      }
+      
+      result[muscle] = MuscleHeatData(
+        muscle: muscle,
+        volume: volume,
+        sets: sets,
+        intensity: setsIntensity.clamp(0.0, 2.0),
+        fatigue: fatigue.clamp(0.0, 1.0),
+        bestWeight: bestWeight,
+        lastWorked: lastWorked,
+      );
+    }
+    
+    return result;
+  }
+
+  /// Compare user's strength to average person of similar profile.
+  /// Returns a map of muscle group to performance ratio (1.0 = average).
+  Map<MuscleGroup, double> getStrengthComparison() {
+    final profile = userProfile;
+    if (profile == null) return {};
+    
+    final standards = _strengthStandards[profile.gender] ?? _strengthStandards['male']!;
+    final bodyWeight = profile.weightKg;
+    if (bodyWeight <= 0) return {};
+    
+    // Age adjustment: peak strength around 25-35, decline ~1% per year after 40
+    double ageMultiplier = 1.0;
+    if (profile.age > 40) {
+      ageMultiplier = 1.0 - ((profile.age - 40) * 0.01);
+    } else if (profile.age < 20) {
+      ageMultiplier = 0.8 + ((profile.age - 15) * 0.04);
+    }
+    ageMultiplier = ageMultiplier.clamp(0.5, 1.1);
+    
+    // Find best lifts for each muscle group from all sessions
+    final bestByMuscle = <MuscleGroup, double>{};
+    for (final session in sessions) {
+      for (final exercise in session.exercises) {
+        final muscles = getMuscleGroups(exercise.name);
+        if (muscles.isEmpty) continue;
+        
+        for (final set in exercise.sets) {
+          if (set.weight <= 0 || set.reps <= 0) continue;
+          // Estimate 1RM using Epley formula
+          final est1rm = set.weight * (1.0 + set.reps / 30.0);
+          
+          for (final muscle in muscles) {
+            if (est1rm > (bestByMuscle[muscle] ?? 0)) {
+              bestByMuscle[muscle] = est1rm;
+            }
+          }
+        }
+      }
+    }
+    
+    // Compare to standards
+    final result = <MuscleGroup, double>{};
+    for (final muscle in MuscleGroup.values) {
+      final standard = standards[muscle];
+      if (standard == null) continue;
+      
+      final expectedStrength = bodyWeight * standard * ageMultiplier;
+      final actual = bestByMuscle[muscle] ?? 0;
+      
+      if (expectedStrength > 0) {
+        result[muscle] = actual / expectedStrength;
+      } else {
+        result[muscle] = 0;
+      }
+    }
+    
+    return result;
+  }
+
+  /// Check if a muscle group is fatigued (worked recently).
+  /// Useful for suggesting modifications to workout plans.
+  bool isMuscleGroupFatigued(MuscleGroup muscle, {double threshold = 0.5}) {
+    final heatMap = getMuscleHeatMap(days: 3);
+    final data = heatMap[muscle];
+    return data != null && data.fatigue >= threshold;
+  }
+
+  /// Get suggestions for workout based on muscle fatigue.
+  List<String> getWorkoutSuggestions() {
+    final suggestions = <String>[];
+    final heatMap = getMuscleHeatMap(days: 3);
+    
+    // Check for fatigued push muscles
+    final chestFatigue = heatMap[MuscleGroup.chest]?.fatigue ?? 0;
+    final shoulderFatigue = heatMap[MuscleGroup.shoulders]?.fatigue ?? 0;
+    final tricepsFatigue = heatMap[MuscleGroup.triceps]?.fatigue ?? 0;
+    
+    if (chestFatigue > 0.6 || shoulderFatigue > 0.6) {
+      suggestions.add('Push muscles are fatigued. Consider a pull or leg day instead.');
+    }
+    
+    // Check for fatigued pull muscles
+    final backFatigue = heatMap[MuscleGroup.back]?.fatigue ?? 0;
+    final bicepsFatigue = heatMap[MuscleGroup.biceps]?.fatigue ?? 0;
+    
+    if (backFatigue > 0.6 || bicepsFatigue > 0.6) {
+      suggestions.add('Pull muscles are fatigued. Consider a push or leg day instead.');
+    }
+    
+    // Check for fatigued legs
+    final quadsFatigue = heatMap[MuscleGroup.quads]?.fatigue ?? 0;
+    final hamstringsFatigue = heatMap[MuscleGroup.hamstrings]?.fatigue ?? 0;
+    final glutesFatigue = heatMap[MuscleGroup.glutes]?.fatigue ?? 0;
+    
+    if (quadsFatigue > 0.6 || hamstringsFatigue > 0.6 || glutesFatigue > 0.6) {
+      suggestions.add('Legs are fatigued. Consider an upper body day.');
+    }
+    
+    // Check for neglected muscle groups (no work in 7 days)
+    for (final entry in heatMap.entries) {
+      if (entry.value.sets == 0) {
+        suggestions.add('${entry.key.displayName} hasn\'t been trained this week.');
+      }
+    }
+    
+    if (suggestions.isEmpty) {
+      suggestions.add('All muscle groups are balanced. Keep up the good work!');
+    }
+    
+    return suggestions;
   }
 
   Future<void> setWeeklyWorkoutGoal(int goal) async {
@@ -731,12 +959,14 @@ class AppState extends ChangeNotifier {
     focusModeEnabled = true;
     tapAssistEnabled = true;
     experimentalMapEnabled = false;
+    experimentalHeatMapEnabled = false;
     supersetModeEnabled = false;
     smartRestEnabled = true;
     supersetPairedIndices = [];
     activeExerciseIndex = 0;
     defaultRestSeconds = 90;
     weeklyWorkoutGoal = 3;
+    userProfile = null;
     routineTemplates
       ..clear()
       ..addAll(_defaultTemplates());
@@ -1051,6 +1281,8 @@ class AppDb {
     required this.routeActivityLogs,
     required this.supersetModeEnabled,
     required this.smartRestEnabled,
+    required this.experimentalHeatMapEnabled,
+    required this.userProfile,
   });
 
   final List<WorkoutSession> sessions;
@@ -1066,6 +1298,8 @@ class AppDb {
   final List<RouteActivityLog> routeActivityLogs;
   final bool supersetModeEnabled;
   final bool smartRestEnabled;
+  final bool experimentalHeatMapEnabled;
+  final UserProfile? userProfile;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
@@ -1073,6 +1307,7 @@ class AppDb {
     final rawPlans = (json['plannedWorkouts'] as List<dynamic>? ?? const []);
     final rawRoutes = (json['mapRoutes'] as List<dynamic>? ?? const []);
     final rawRouteLogs = (json['routeActivityLogs'] as List<dynamic>? ?? const []);
+    final rawProfile = json['userProfile'] as Map<String, Object?>?;
     return AppDb(
       sessions: rawSessions
           .whereType<Map<String, Object?>>()
@@ -1102,6 +1337,8 @@ class AppDb {
           rawRouteLogs.whereType<Map<String, Object?>>().map(RouteActivityLog.fromJson).where((l) => l.routeId.isNotEmpty).toList(),
       supersetModeEnabled: (json['supersetModeEnabled'] as bool?) ?? false,
       smartRestEnabled: (json['smartRestEnabled'] as bool?) ?? true,
+      experimentalHeatMapEnabled: (json['experimentalHeatMapEnabled'] as bool?) ?? false,
+      userProfile: rawProfile != null ? UserProfile.fromJson(rawProfile) : null,
     );
   }
 
@@ -1119,6 +1356,8 @@ class AppDb {
         'routeActivityLogs': routeActivityLogs.map((l) => l.toJson()).toList(),
         'supersetModeEnabled': supersetModeEnabled,
         'smartRestEnabled': smartRestEnabled,
+        'experimentalHeatMapEnabled': experimentalHeatMapEnabled,
+        'userProfile': userProfile?.toJson(),
       };
 }
 
@@ -1565,5 +1804,149 @@ class RouteActivityLog {
         'activityType': activityType.name,
         'startedAt': startedAt.toIso8601String(),
       };
+}
+
+/// User profile for strength comparisons.
+class UserProfile {
+  const UserProfile({
+    required this.age,
+    required this.weightKg,
+    required this.heightCm,
+    required this.gender,
+  });
+
+  final int age;
+  final double weightKg;
+  final double heightCm;
+  final String gender; // 'male' or 'female'
+
+  factory UserProfile.fromJson(Map<String, Object?> json) {
+    return UserProfile(
+      age: (json['age'] as num?)?.toInt() ?? 25,
+      weightKg: (json['weightKg'] as num?)?.toDouble() ?? 70,
+      heightCm: (json['heightCm'] as num?)?.toDouble() ?? 170,
+      gender: (json['gender'] as String?) ?? 'male',
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'age': age,
+        'weightKg': weightKg,
+        'heightCm': heightCm,
+        'gender': gender,
+      };
+
+  UserProfile copyWith({
+    int? age,
+    double? weightKg,
+    double? heightCm,
+    String? gender,
+  }) {
+    return UserProfile(
+      age: age ?? this.age,
+      weightKg: weightKg ?? this.weightKg,
+      heightCm: heightCm ?? this.heightCm,
+      gender: gender ?? this.gender,
+    );
+  }
+}
+
+/// Muscle groups for heat map visualization.
+enum MuscleGroup {
+  chest,
+  back,
+  shoulders,
+  biceps,
+  triceps,
+  quads,
+  hamstrings,
+  glutes,
+  calves,
+  core,
+}
+
+extension MuscleGroupX on MuscleGroup {
+  String get displayName {
+    switch (this) {
+      case MuscleGroup.chest:
+        return 'Chest';
+      case MuscleGroup.back:
+        return 'Back';
+      case MuscleGroup.shoulders:
+        return 'Shoulders';
+      case MuscleGroup.biceps:
+        return 'Biceps';
+      case MuscleGroup.triceps:
+        return 'Triceps';
+      case MuscleGroup.quads:
+        return 'Quads';
+      case MuscleGroup.hamstrings:
+        return 'Hamstrings';
+      case MuscleGroup.glutes:
+        return 'Glutes';
+      case MuscleGroup.calves:
+        return 'Calves';
+      case MuscleGroup.core:
+        return 'Core';
+    }
+  }
+
+  /// Category for grouping (push/pull/legs).
+  String get category {
+    switch (this) {
+      case MuscleGroup.chest:
+      case MuscleGroup.shoulders:
+      case MuscleGroup.triceps:
+        return 'Push';
+      case MuscleGroup.back:
+      case MuscleGroup.biceps:
+        return 'Pull';
+      case MuscleGroup.quads:
+      case MuscleGroup.hamstrings:
+      case MuscleGroup.glutes:
+      case MuscleGroup.calves:
+        return 'Legs';
+      case MuscleGroup.core:
+        return 'Core';
+    }
+  }
+}
+
+/// Heat map data for a single muscle group.
+class MuscleHeatData {
+  const MuscleHeatData({
+    required this.muscle,
+    required this.volume,
+    required this.sets,
+    required this.intensity,
+    required this.fatigue,
+    required this.bestWeight,
+    required this.lastWorked,
+  });
+
+  final MuscleGroup muscle;
+  final double volume; // Total volume (weight × reps)
+  final int sets; // Total sets in period
+  final double intensity; // 0.0-2.0+ (1.0 = baseline)
+  final double fatigue; // 0.0-1.0 (current fatigue level)
+  final double bestWeight; // Best weight lifted
+  final DateTime? lastWorked; // Last time this muscle was trained
+
+  /// Get a color representing the fatigue level.
+  /// Green = recovered, Yellow = moderate, Red = fatigued
+  int get fatigueColorValue {
+    if (fatigue < 0.3) return 0xFF4CAF50; // Green
+    if (fatigue < 0.6) return 0xFFFFEB3B; // Yellow
+    return 0xFFF44336; // Red
+  }
+
+  /// Get a color representing the intensity level.
+  /// Blue = undertrained, Green = optimal, Orange/Red = high volume
+  int get intensityColorValue {
+    if (intensity < 0.5) return 0xFF2196F3; // Blue - undertrained
+    if (intensity < 1.2) return 0xFF4CAF50; // Green - optimal
+    if (intensity < 1.8) return 0xFFFF9800; // Orange - high
+    return 0xFFF44336; // Red - very high
+  }
 }
 
