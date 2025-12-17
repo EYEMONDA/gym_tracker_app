@@ -36,6 +36,12 @@ class AppState extends ChangeNotifier {
   /// Experimental features live behind toggles.
   bool experimentalMapEnabled = false;
 
+  /// Experimental: Muscle heat map feature.
+  bool experimentalHeatMapEnabled = false;
+
+  /// User profile for comparisons (optional).
+  UserProfile? userProfile;
+
   /// Which exercise is currently “focused” for fast logging.
   int activeExerciseIndex = 0;
 
@@ -91,6 +97,132 @@ class AppState extends ChangeNotifier {
     'barbell row', 'row', 'pull-up', 'pullup', 'chin-up', 'chinup',
     'leg press', 'romanian deadlift', 'rdl', 'hip thrust', 'dip', 'dips',
     'clean', 'snatch', 'front squat', 'back squat', 'military press',
+  };
+
+  /// Exercise-to-muscle group mapping for heat map.
+  static const exerciseToMuscles = <String, List<MuscleGroup>>{
+    // Chest
+    'bench press': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    'bench': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    'incline press': [MuscleGroup.chest, MuscleGroup.shoulders, MuscleGroup.triceps],
+    'incline bench': [MuscleGroup.chest, MuscleGroup.shoulders, MuscleGroup.triceps],
+    'decline press': [MuscleGroup.chest, MuscleGroup.triceps],
+    'dumbbell press': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    'chest fly': [MuscleGroup.chest],
+    'fly': [MuscleGroup.chest],
+    'pec deck': [MuscleGroup.chest],
+    'cable crossover': [MuscleGroup.chest],
+    'push-up': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    'pushup': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    'dip': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    'dips': [MuscleGroup.chest, MuscleGroup.triceps, MuscleGroup.shoulders],
+    
+    // Back
+    'pull-up': [MuscleGroup.back, MuscleGroup.biceps],
+    'pullup': [MuscleGroup.back, MuscleGroup.biceps],
+    'chin-up': [MuscleGroup.back, MuscleGroup.biceps],
+    'chinup': [MuscleGroup.back, MuscleGroup.biceps],
+    'lat pulldown': [MuscleGroup.back, MuscleGroup.biceps],
+    'pulldown': [MuscleGroup.back, MuscleGroup.biceps],
+    'row': [MuscleGroup.back, MuscleGroup.biceps],
+    'barbell row': [MuscleGroup.back, MuscleGroup.biceps],
+    'dumbbell row': [MuscleGroup.back, MuscleGroup.biceps],
+    'cable row': [MuscleGroup.back, MuscleGroup.biceps],
+    'seated row': [MuscleGroup.back, MuscleGroup.biceps],
+    't-bar row': [MuscleGroup.back, MuscleGroup.biceps],
+    'deadlift': [MuscleGroup.back, MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'romanian deadlift': [MuscleGroup.back, MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'rdl': [MuscleGroup.back, MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'face pull': [MuscleGroup.back, MuscleGroup.shoulders],
+    'shrug': [MuscleGroup.back],
+    
+    // Shoulders
+    'overhead press': [MuscleGroup.shoulders, MuscleGroup.triceps],
+    'ohp': [MuscleGroup.shoulders, MuscleGroup.triceps],
+    'military press': [MuscleGroup.shoulders, MuscleGroup.triceps],
+    'shoulder press': [MuscleGroup.shoulders, MuscleGroup.triceps],
+    'lateral raise': [MuscleGroup.shoulders],
+    'front raise': [MuscleGroup.shoulders],
+    'rear delt': [MuscleGroup.shoulders, MuscleGroup.back],
+    'arnold press': [MuscleGroup.shoulders, MuscleGroup.triceps],
+    'upright row': [MuscleGroup.shoulders, MuscleGroup.back],
+    
+    // Arms
+    'bicep curl': [MuscleGroup.biceps],
+    'curl': [MuscleGroup.biceps],
+    'hammer curl': [MuscleGroup.biceps],
+    'preacher curl': [MuscleGroup.biceps],
+    'concentration curl': [MuscleGroup.biceps],
+    'tricep extension': [MuscleGroup.triceps],
+    'tricep pushdown': [MuscleGroup.triceps],
+    'skull crusher': [MuscleGroup.triceps],
+    'close grip bench': [MuscleGroup.triceps, MuscleGroup.chest],
+    'kickback': [MuscleGroup.triceps],
+    
+    // Legs
+    'squat': [MuscleGroup.quads, MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'front squat': [MuscleGroup.quads, MuscleGroup.glutes],
+    'back squat': [MuscleGroup.quads, MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'leg press': [MuscleGroup.quads, MuscleGroup.glutes],
+    'lunge': [MuscleGroup.quads, MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'split squat': [MuscleGroup.quads, MuscleGroup.glutes],
+    'bulgarian split squat': [MuscleGroup.quads, MuscleGroup.glutes],
+    'leg extension': [MuscleGroup.quads],
+    'leg curl': [MuscleGroup.hamstrings],
+    'hamstring curl': [MuscleGroup.hamstrings],
+    'hip thrust': [MuscleGroup.glutes, MuscleGroup.hamstrings],
+    'glute bridge': [MuscleGroup.glutes],
+    'calf raise': [MuscleGroup.calves],
+    'seated calf raise': [MuscleGroup.calves],
+    'standing calf raise': [MuscleGroup.calves],
+    
+    // Core
+    'plank': [MuscleGroup.core],
+    'crunch': [MuscleGroup.core],
+    'sit-up': [MuscleGroup.core],
+    'situp': [MuscleGroup.core],
+    'leg raise': [MuscleGroup.core],
+    'russian twist': [MuscleGroup.core],
+    'ab wheel': [MuscleGroup.core],
+    'cable crunch': [MuscleGroup.core],
+    'hanging leg raise': [MuscleGroup.core],
+    'woodchop': [MuscleGroup.core],
+    
+    // Full body / Olympic
+    'clean': [MuscleGroup.back, MuscleGroup.shoulders, MuscleGroup.quads, MuscleGroup.glutes],
+    'snatch': [MuscleGroup.back, MuscleGroup.shoulders, MuscleGroup.quads, MuscleGroup.glutes],
+    'clean and jerk': [MuscleGroup.back, MuscleGroup.shoulders, MuscleGroup.quads, MuscleGroup.glutes, MuscleGroup.triceps],
+    'thruster': [MuscleGroup.quads, MuscleGroup.glutes, MuscleGroup.shoulders, MuscleGroup.triceps],
+    'burpee': [MuscleGroup.chest, MuscleGroup.quads, MuscleGroup.core],
+  };
+
+  /// Average strength standards by muscle group (1RM as ratio of body weight).
+  /// Based on intermediate lifter standards. Format: {gender: {muscleGroup: ratio}}
+  static const _strengthStandards = <String, Map<MuscleGroup, double>>{
+    'male': {
+      MuscleGroup.chest: 1.25,      // Bench press ~1.25x BW
+      MuscleGroup.back: 1.5,        // Deadlift contribution
+      MuscleGroup.shoulders: 0.75,  // OHP ~0.75x BW
+      MuscleGroup.biceps: 0.5,      // Curl ~0.5x BW
+      MuscleGroup.triceps: 0.6,     // Close grip bench
+      MuscleGroup.quads: 1.5,       // Squat ~1.5x BW
+      MuscleGroup.hamstrings: 1.25, // RDL
+      MuscleGroup.glutes: 1.75,     // Hip thrust
+      MuscleGroup.calves: 1.5,      // Calf raise
+      MuscleGroup.core: 0.5,        // Weighted core work
+    },
+    'female': {
+      MuscleGroup.chest: 0.75,
+      MuscleGroup.back: 1.0,
+      MuscleGroup.shoulders: 0.5,
+      MuscleGroup.biceps: 0.35,
+      MuscleGroup.triceps: 0.4,
+      MuscleGroup.quads: 1.25,
+      MuscleGroup.hamstrings: 1.0,
+      MuscleGroup.glutes: 1.5,
+      MuscleGroup.calves: 1.25,
+      MuscleGroup.core: 0.4,
+    },
   };
 
   bool get loaded => _loaded;
