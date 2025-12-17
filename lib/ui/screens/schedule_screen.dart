@@ -21,10 +21,36 @@ class ScheduleScreen extends StatelessWidget {
     return '${d.year}-$m-$day';
   }
 
+  static const _categoryOrder = <RoutineCategory>[
+    RoutineCategory.strength,
+    RoutineCategory.cardio,
+    RoutineCategory.mobility,
+    RoutineCategory.custom,
+  ];
+
+  static String _categoryLabel(RoutineCategory c) {
+    switch (c) {
+      case RoutineCategory.strength:
+        return 'Strength';
+      case RoutineCategory.cardio:
+        return 'Cardio';
+      case RoutineCategory.mobility:
+        return 'Mobility';
+      case RoutineCategory.custom:
+        return 'Custom';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = AppScope.of(context);
     final suggestion = app.suggestNextWorkout();
+    final templates = List<RoutineTemplate>.of(app.routineTemplates)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final byCategory = <RoutineCategory, List<RoutineTemplate>>{};
+    for (final t in templates) {
+      (byCategory[t.category] ??= []).add(t);
+    }
 
     return SafeArea(
       child: ListView(
@@ -64,47 +90,62 @@ class ScheduleScreen extends StatelessWidget {
                   style: TextStyle(color: Color(0xAAFFFFFF)),
                 ),
                 const SizedBox(height: 10),
-                if (app.routineTemplates.isEmpty)
+                if (templates.isEmpty)
                   const Text('No templates.', style: TextStyle(color: Color(0xAAFFFFFF)))
                 else
-                  ...app.routineTemplates.map((t) {
-                    final preview = t.exercises.take(3).map((e) => e.name).where((s) => s.trim().isNotEmpty).join(', ');
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A0A0A),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0x22FFFFFF)),
-                      ),
-                      child: ListTile(
-                        title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w800)),
-                        subtitle: Text(
-                          preview.isEmpty ? '${t.exercises.length} items' : '$preview${t.exercises.length > 3 ? '…' : ''}',
-                          style: const TextStyle(color: Color(0xAAFFFFFF)),
-                        ),
-                        trailing: FilledButton.tonal(
-                          onPressed: () {
-                            // Quick-start this template now (not a calendar plan).
-                            if (app.activeSession == null) {
-                              app.startWorkout(title: t.name);
-                              for (final e in t.exercises) {
-                                if (e.name.trim().isEmpty) continue;
-                                app.addExerciseToActive(e.name);
-                              }
-                              app.requestedTabIndex = 0;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Started workout from template.')),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Finish/discard current workout first.')),
-                              );
-                            }
-                          },
-                          child: const Text('Start'),
-                        ),
+                  ..._categoryOrder.where(byCategory.containsKey).expand((cat) sync* {
+                    yield Padding(
+                      padding: const EdgeInsets.only(bottom: 8, top: 4),
+                      child: Text(
+                        _categoryLabel(cat),
+                        style: const TextStyle(color: Color(0xAAFFFFFF), fontWeight: FontWeight.w800),
                       ),
                     );
+                    for (final t in byCategory[cat]!) {
+                      final preview = t.exercises
+                          .take(3)
+                          .map((e) => e.name)
+                          .where((s) => s.trim().isNotEmpty)
+                          .join(', ');
+                      yield Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0A0A0A),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0x22FFFFFF)),
+                        ),
+                        child: ListTile(
+                          title: Text(t.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          subtitle: Text(
+                            preview.isEmpty
+                                ? '${t.exercises.length} items'
+                                : '$preview${t.exercises.length > 3 ? '…' : ''}',
+                            style: const TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                          trailing: FilledButton.tonal(
+                            onPressed: () {
+                              // Quick-start this template now (not a calendar plan).
+                              if (app.activeSession == null) {
+                                app.startWorkout(title: t.name);
+                                for (final e in t.exercises) {
+                                  if (e.name.trim().isEmpty) continue;
+                                  app.addExerciseToActive(e.name);
+                                }
+                                app.requestedTabIndex = 0;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Started workout from template.')),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Finish/discard current workout first.')),
+                                );
+                              }
+                            },
+                            child: const Text('Start'),
+                          ),
+                        ),
+                      );
+                    }
                   }),
               ],
             ),

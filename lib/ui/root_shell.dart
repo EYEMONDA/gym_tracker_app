@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../state/app_state.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/log_screen.dart';
+import 'screens/progress_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/workout_screen.dart';
@@ -34,6 +35,7 @@ class _RootShellState extends State<RootShell> {
       const WorkoutScreen(),
       const LogScreen(),
       const CalendarScreen(),
+      const ProgressScreen(),
       const ScheduleScreen(),
       const SettingsScreen(),
     ];
@@ -82,6 +84,11 @@ class _RootShellState extends State<RootShell> {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Calendar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.show_chart_outlined),
+            selectedIcon: Icon(Icons.show_chart),
+            label: 'Progress',
           ),
           NavigationDestination(
             icon: Icon(Icons.auto_awesome_outlined),

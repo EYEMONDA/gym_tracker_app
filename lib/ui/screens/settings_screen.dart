@@ -104,6 +104,28 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Tap Assist', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                const Text(
+                  'Increases touch targets without changing the visual layout (helps reduce missed taps).',
+                  style: TextStyle(color: Color(0xAAFFFFFF)),
+                ),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: app.tapAssistEnabled,
+                  onChanged: (v) => app.setTapAssistEnabled(v),
+                  title: const Text('Enable Tap Assist'),
+                  subtitle: const Text('Recommended on phones.'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 const Text('Default rest timer', style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
                 Text(

@@ -41,7 +41,9 @@ class _DynamicIslandState extends State<DynamicIsland> {
 
   String _formatSetLine(ExerciseSet s) {
     final w = s.weight.toStringAsFixed(s.weight == s.weight.roundToDouble() ? 0 : 1);
-    return '${s.reps} reps • $w ${s.unit}';
+    final rpe = s.rpe;
+    final rpeText = rpe == null ? '' : ' • RPE ${rpe.toStringAsFixed(rpe == rpe.roundToDouble() ? 0 : 1)}';
+    return '${s.reps} reps • $w ${s.unit}$rpeText';
   }
 
   @override
@@ -51,6 +53,7 @@ class _DynamicIslandState extends State<DynamicIsland> {
     final hits = app.searchAll(app.searchQuery);
     final workoutActive = app.activeSession != null;
     final focusMode = app.focusModeEnabled;
+    final tapAssist = app.tapAssistEnabled;
 
     // Keep controller aligned when state changes from elsewhere.
     if (_controller.text != app.searchQuery) {
@@ -81,6 +84,9 @@ class _DynamicIslandState extends State<DynamicIsland> {
     if (!workoutActive || !focusMode) {
       _showFocusPanel = false;
     }
+
+    final double iconMin = tapAssist ? 48 : 32;
+    final double iconPad = tapAssist ? 10 : 0;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -127,6 +133,8 @@ class _DynamicIslandState extends State<DynamicIsland> {
                         focusMode: focusMode,
                         accent: accent,
                         focusPanel: _showFocusPanel,
+                        tapAssistMinSize: iconMin,
+                        tapAssistPadding: iconPad,
                         onTogglePanel: (focus) => setState(() => _showFocusPanel = focus),
                         onClose: () {
                           app.setSearchExpanded(false);
@@ -194,6 +202,8 @@ class _TopRow extends StatelessWidget {
     required this.focusMode,
     required this.accent,
     required this.focusPanel,
+    required this.tapAssistMinSize,
+    required this.tapAssistPadding,
     required this.onTogglePanel,
     required this.onClose,
     required this.searchField,
@@ -206,6 +216,8 @@ class _TopRow extends StatelessWidget {
   final bool focusMode;
   final Color accent;
   final bool focusPanel;
+  final double tapAssistMinSize;
+  final double tapAssistPadding;
   final void Function(bool focusPanel) onTogglePanel;
   final VoidCallback onClose;
   final Widget searchField;
@@ -264,23 +276,23 @@ class _TopRow extends StatelessWidget {
           if (focusMode && workoutActive)
             IconButton(
               tooltip: focusPanel ? 'Search' : 'Focus',
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              padding: EdgeInsets.all(tapAssistPadding),
+              constraints: BoxConstraints(minWidth: tapAssistMinSize, minHeight: tapAssistMinSize),
               icon: Icon(focusPanel ? Icons.search : Icons.fitness_center, size: 18),
               onPressed: () => onTogglePanel(!focusPanel),
             ),
           IconButton(
             tooltip: 'Close',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.all(tapAssistPadding),
+            constraints: BoxConstraints(minWidth: tapAssistMinSize, minHeight: tapAssistMinSize),
             icon: const Icon(Icons.close, size: 18),
             onPressed: onClose,
           ),
         ] else if (canShowFocusCollapsed)
           IconButton(
             tooltip: 'Add set',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.all(tapAssistPadding),
+            constraints: BoxConstraints(minWidth: tapAssistMinSize, minHeight: tapAssistMinSize),
             icon: Icon(Icons.add_circle, size: 18, color: accent.withOpacity(0.95)),
             onPressed: () {
               final added = app.addQuickSetToActive();
@@ -301,8 +313,8 @@ class _TopRow extends StatelessWidget {
         else if (rest.isRunning)
           IconButton(
             tooltip: 'Stop timer',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.all(tapAssistPadding),
+            constraints: BoxConstraints(minWidth: tapAssistMinSize, minHeight: tapAssistMinSize),
             icon: const Icon(Icons.stop_circle_outlined, size: 18),
             onPressed: app.stopRestTimer,
           ),

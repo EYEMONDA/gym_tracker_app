@@ -10,11 +10,12 @@ Core Features Implemented
   - Shows an always-available rest timer in compact mode.
   - Focus Mode: when a workout is active, the Island morphs into a quick logger (one-tap “Add set”).
   - Subtle state lighting: green glow for active workout logging, amber glow for rest timer.
+  - Tap Assist option: increases touch targets without changing layout (helps reduce missed taps).
 
 - Workout tracker (live session)
   - Start a workout session.
   - Add exercises.
-  - Add sets (reps + weight + unit).
+  - Add sets (reps + weight + unit + optional RPE).
   - Automatically starts a rest timer after adding a set.
   - Save workout to local history.
 
@@ -30,6 +31,11 @@ Core Features Implemented
     - Planned routines (multiple per day) with Start/Skip/Delete actions
     - Completed workouts for that day
   - “Plan” button lets you schedule multiple routines on the same date (with optional time label like AM/PM/18:00).
+
+- Progress
+  - Weekly workout goal tracking (simple progress bar).
+  - Last-8-weeks consistency visualization (workouts/week bars).
+  - Personal records (estimated 1RM) computed from logged weighted sets.
 
 - Smart schedule (lightweight)
   - Suggests the next workout day based on:
@@ -72,6 +78,10 @@ What was used (and why)
 - Smart search (in the Dynamic Island)
   - Why: Quickly add exercises from past sessions; fast navigation.
   - How: Searches across recent sessions + the active session.
+
+- RPE + PR estimation (lightweight analytics)
+  - Why: RPE captures difficulty, PRs show progress at a glance.
+  - How: RPE is stored per set; PRs use a simple 1RM estimate from logged sets.
 
 Where things live in the code
 - App entry/theme: lib/main.dart

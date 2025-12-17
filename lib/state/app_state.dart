@@ -30,6 +30,9 @@ class AppState extends ChangeNotifier {
   /// Focus mode: Dynamic Island becomes a quick logger during workouts.
   bool focusModeEnabled = true;
 
+  /// Tap Assist: increases touch targets without changing layout.
+  bool tapAssistEnabled = true;
+
   /// Which exercise is currently “focused” for fast logging.
   int activeExerciseIndex = 0;
 
@@ -41,6 +44,9 @@ class AppState extends ChangeNotifier {
 
   /// Planned routines on the calendar (can be multiple per day).
   final List<PlannedWorkout> plannedWorkouts = [];
+
+  /// Weekly goal: number of workouts per week.
+  int weeklyWorkoutGoal = 3;
 
   /// Used to request a tab switch from deep UI actions (e.g. starting a plan).
   int? requestedTabIndex;
@@ -95,6 +101,8 @@ class AppState extends ChangeNotifier {
           ..addAll(db.plannedWorkouts);
         defaultRestSeconds = db.defaultRestSeconds;
         focusModeEnabled = db.focusModeEnabled;
+        tapAssistEnabled = db.tapAssistEnabled;
+        weeklyWorkoutGoal = db.weeklyWorkoutGoal;
         preferredWeekdays
           ..clear()
           ..addAll(db.preferredWeekdays);
@@ -121,6 +129,8 @@ class AppState extends ChangeNotifier {
       plannedWorkouts: plannedWorkouts,
       defaultRestSeconds: defaultRestSeconds,
       focusModeEnabled: focusModeEnabled,
+      tapAssistEnabled: tapAssistEnabled,
+      weeklyWorkoutGoal: weeklyWorkoutGoal,
       preferredWeekdays: preferredWeekdays.toList()..sort(),
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
@@ -200,12 +210,12 @@ class AppState extends ChangeNotifier {
   }
 
   void addSetToExercise(int exerciseIndex,
-      {int reps = 10, double weight = 0, String? unit}) {
+      {int reps = 10, double weight = 0, String? unit, double? rpe}) {
     final draft = activeSession;
     if (draft == null) return;
     if (exerciseIndex < 0 || exerciseIndex >= draft.exercises.length) return;
     draft.exercises[exerciseIndex].sets.add(
-          ExerciseSet(reps: reps, weight: weight, unit: unit ?? 'kg'),
+          ExerciseSet(reps: reps, weight: weight, unit: unit ?? 'kg', rpe: rpe),
         );
     activeExerciseIndex = exerciseIndex;
     notifyListeners();
@@ -293,6 +303,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setTapAssistEnabled(bool enabled) async {
+    if (tapAssistEnabled == enabled) return;
+    tapAssistEnabled = enabled;
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> setWeeklyWorkoutGoal(int goal) async {
+    weeklyWorkoutGoal = goal.clamp(1, 14);
+    await _persist();
+    notifyListeners();
+  }
+
   void setActiveExerciseIndex(int index) {
     final draft = activeSession;
     if (draft == null) return;
@@ -319,6 +342,7 @@ class AppState extends ChangeNotifier {
       reps: (last?.reps ?? 10).clamp(1, 999),
       weight: last?.weight ?? 0,
       unit: last?.unit ?? 'kg',
+      rpe: last?.rpe,
     );
     ex.sets.add(next);
 
@@ -361,8 +385,10 @@ class AppState extends ChangeNotifier {
     searchQuery = '';
     isSearchExpanded = false;
     focusModeEnabled = true;
+    tapAssistEnabled = true;
     activeExerciseIndex = 0;
     defaultRestSeconds = 90;
+    weeklyWorkoutGoal = 3;
     routineTemplates
       ..clear()
       ..addAll(_defaultTemplates());
@@ -391,6 +417,7 @@ class AppState extends ChangeNotifier {
       RoutineTemplate(
         id: 'tpl_full_body',
         name: 'Full Body',
+        category: RoutineCategory.strength,
         exercises: [
           RoutineExerciseTemplate(name: 'Squat'),
           RoutineExerciseTemplate(name: 'Bench Press'),
@@ -401,6 +428,7 @@ class AppState extends ChangeNotifier {
       RoutineTemplate(
         id: 'tpl_upper',
         name: 'Upper',
+        category: RoutineCategory.strength,
         exercises: [
           RoutineExerciseTemplate(name: 'Bench Press'),
           RoutineExerciseTemplate(name: 'Pull-up / Lat Pulldown'),
@@ -411,6 +439,7 @@ class AppState extends ChangeNotifier {
       RoutineTemplate(
         id: 'tpl_lower',
         name: 'Lower',
+        category: RoutineCategory.strength,
         exercises: [
           RoutineExerciseTemplate(name: 'Squat'),
           RoutineExerciseTemplate(name: 'RDL / Deadlift'),
@@ -421,6 +450,7 @@ class AppState extends ChangeNotifier {
       RoutineTemplate(
         id: 'tpl_cardio',
         name: 'Cardio',
+        category: RoutineCategory.cardio,
         exercises: [
           RoutineExerciseTemplate(name: 'Run / Bike / Row'),
           RoutineExerciseTemplate(name: 'Zone 2 (20–40m)'),
@@ -429,6 +459,7 @@ class AppState extends ChangeNotifier {
       RoutineTemplate(
         id: 'tpl_mobility',
         name: 'Mobility',
+        category: RoutineCategory.mobility,
         exercises: [
           RoutineExerciseTemplate(name: 'Warm-up'),
           RoutineExerciseTemplate(name: 'Stretching'),
@@ -614,6 +645,8 @@ class AppDb {
     required this.plannedWorkouts,
     required this.defaultRestSeconds,
     required this.focusModeEnabled,
+    required this.tapAssistEnabled,
+    required this.weeklyWorkoutGoal,
     required this.preferredWeekdays,
   });
 
@@ -622,6 +655,8 @@ class AppDb {
   final List<PlannedWorkout> plannedWorkouts;
   final int defaultRestSeconds;
   final bool focusModeEnabled;
+  final bool tapAssistEnabled;
+  final int weeklyWorkoutGoal;
   final List<int> preferredWeekdays;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
@@ -643,6 +678,8 @@ class AppDb {
           .toList(),
       defaultRestSeconds: (json['defaultRestSeconds'] as num?)?.toInt() ?? 90,
       focusModeEnabled: (json['focusModeEnabled'] as bool?) ?? true,
+      tapAssistEnabled: (json['tapAssistEnabled'] as bool?) ?? true,
+      weeklyWorkoutGoal: (json['weeklyWorkoutGoal'] as num?)?.toInt() ?? 3,
       preferredWeekdays: (json['preferredWeekdays'] as List<dynamic>? ?? const [])
           .whereType<num>()
           .map((e) => e.toInt())
@@ -657,6 +694,8 @@ class AppDb {
         'plannedWorkouts': plannedWorkouts.map((p) => p.toJson()).toList(),
         'defaultRestSeconds': defaultRestSeconds,
         'focusModeEnabled': focusModeEnabled,
+        'tapAssistEnabled': tapAssistEnabled,
+        'weeklyWorkoutGoal': weeklyWorkoutGoal,
         'preferredWeekdays': preferredWeekdays,
       };
 }
@@ -760,20 +799,27 @@ class ExerciseEntry {
 }
 
 class ExerciseSet {
-  const ExerciseSet({required this.reps, required this.weight, required this.unit});
+  const ExerciseSet({
+    required this.reps,
+    required this.weight,
+    required this.unit,
+    this.rpe,
+  });
   final int reps;
   final double weight;
   final String unit; // kg / lb / bw
+  final double? rpe; // 1..10 (optional)
 
   factory ExerciseSet.fromJson(Map<String, Object?> json) {
     return ExerciseSet(
       reps: (json['reps'] as num?)?.toInt() ?? 0,
       weight: (json['weight'] as num?)?.toDouble() ?? 0,
       unit: (json['unit'] as String?) ?? 'kg',
+      rpe: (json['rpe'] as num?)?.toDouble(),
     );
   }
 
-  Map<String, Object?> toJson() => {'reps': reps, 'weight': weight, 'unit': unit};
+  Map<String, Object?> toJson() => {'reps': reps, 'weight': weight, 'unit': unit, 'rpe': rpe};
 }
 
 class RestTimerState {
@@ -846,11 +892,13 @@ class RoutineTemplate {
   const RoutineTemplate({
     required this.id,
     required this.name,
+    required this.category,
     required this.exercises,
   });
 
   final String id;
   final String name;
+  final RoutineCategory category;
   final List<RoutineExerciseTemplate> exercises;
 
   factory RoutineTemplate.fromJson(Map<String, Object?> json) {
@@ -858,6 +906,7 @@ class RoutineTemplate {
     return RoutineTemplate(
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? 'Routine',
+      category: RoutineCategoryX.fromString((json['category'] as String?) ?? 'strength'),
       exercises: raw
           .whereType<Map<String, Object?>>()
           .map(RoutineExerciseTemplate.fromJson)
@@ -868,8 +917,27 @@ class RoutineTemplate {
   Map<String, Object?> toJson() => {
         'id': id,
         'name': name,
+        'category': category.name,
         'exercises': exercises.map((e) => e.toJson()).toList(),
       };
+}
+
+enum RoutineCategory { strength, cardio, mobility, custom }
+
+extension RoutineCategoryX on RoutineCategory {
+  static RoutineCategory fromString(String raw) {
+    switch (raw) {
+      case 'cardio':
+        return RoutineCategory.cardio;
+      case 'mobility':
+        return RoutineCategory.mobility;
+      case 'custom':
+        return RoutineCategory.custom;
+      case 'strength':
+      default:
+        return RoutineCategory.strength;
+    }
+  }
 }
 
 class RoutineExerciseTemplate {

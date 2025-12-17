@@ -124,10 +124,14 @@ class SessionDetailScreen extends StatelessWidget {
                   else
                     ...List.generate(e.sets.length, (i) {
                       final s = e.sets[i];
+                      final w = s.weight.toStringAsFixed(s.weight == s.weight.roundToDouble() ? 0 : 1);
+                      final rpe = s.rpe;
+                      final rpeText =
+                          rpe == null ? '' : ' • RPE ${rpe.toStringAsFixed(rpe == rpe.roundToDouble() ? 0 : 1)}';
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Text(
-                          'Set ${i + 1}: ${s.reps} reps • ${s.weight.toStringAsFixed(s.weight == s.weight.roundToDouble() ? 0 : 1)} ${s.unit}',
+                          'Set ${i + 1}: ${s.reps} reps • $w ${s.unit}$rpeText',
                           style: const TextStyle(color: Color(0xDDFFFFFF)),
                         ),
                       );

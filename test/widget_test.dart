@@ -17,6 +17,7 @@ void main() {
     expect(find.text('Workout'), findsWidgets);
     expect(find.text('Log'), findsWidgets);
     expect(find.text('Calendar'), findsWidgets);
+    expect(find.text('Progress'), findsWidgets);
     expect(find.text('Schedule'), findsWidgets);
     expect(find.text('Settings'), findsWidgets);
   });
