@@ -48,6 +48,13 @@ Core Features Implemented
   - Used as an offline “identity anchor” without accounts.
   - Can be copied/regenerated in Settings.
 
+- Experimental features
+  - Settings includes an “Experimental” sub-tab with per-feature toggles.
+  - Map + Routes (experimental):
+    - Create routes by tapping points on a map (polyline).
+    - Log route usage categorized as walk/jog/bike.
+    - Uses online tiles (may be slower/unstable depending on device/network).
+
 Design Goals
 - Web-first but native-ready: build once, ship everywhere.
 - No account friction: immediate use, fully offline.

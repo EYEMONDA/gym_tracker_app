@@ -20,5 +20,9 @@ void main() {
     expect(find.text('Progress'), findsWidgets);
     expect(find.text('Schedule'), findsWidgets);
     expect(find.text('Settings'), findsWidgets);
+
+    // Settings sub-tabs exist.
+    expect(find.text('General'), findsWidgets);
+    expect(find.text('Experimental'), findsWidgets);
   });
 }

@@ -33,6 +33,9 @@ class AppState extends ChangeNotifier {
   /// Tap Assist: increases touch targets without changing layout.
   bool tapAssistEnabled = true;
 
+  /// Experimental features live behind toggles.
+  bool experimentalMapEnabled = false;
+
   /// Which exercise is currently “focused” for fast logging.
   int activeExerciseIndex = 0;
 
@@ -44,6 +47,12 @@ class AppState extends ChangeNotifier {
 
   /// Planned routines on the calendar (can be multiple per day).
   final List<PlannedWorkout> plannedWorkouts = [];
+
+  /// Map routes (experimental).
+  final List<MapRoute> mapRoutes = [];
+
+  /// Route usage logs (experimental).
+  final List<RouteActivityLog> routeActivityLogs = [];
 
   /// Weekly goal: number of workouts per week.
   int weeklyWorkoutGoal = 3;
@@ -102,10 +111,18 @@ class AppState extends ChangeNotifier {
         defaultRestSeconds = db.defaultRestSeconds;
         focusModeEnabled = db.focusModeEnabled;
         tapAssistEnabled = db.tapAssistEnabled;
+        experimentalMapEnabled = db.experimentalMapEnabled;
         weeklyWorkoutGoal = db.weeklyWorkoutGoal;
         preferredWeekdays
           ..clear()
           ..addAll(db.preferredWeekdays);
+
+        mapRoutes
+          ..clear()
+          ..addAll(db.mapRoutes);
+        routeActivityLogs
+          ..clear()
+          ..addAll(db.routeActivityLogs);
       } catch (_) {
         // If the DB is corrupt, keep the app usable.
       }
@@ -130,8 +147,11 @@ class AppState extends ChangeNotifier {
       defaultRestSeconds: defaultRestSeconds,
       focusModeEnabled: focusModeEnabled,
       tapAssistEnabled: tapAssistEnabled,
+      experimentalMapEnabled: experimentalMapEnabled,
       weeklyWorkoutGoal: weeklyWorkoutGoal,
       preferredWeekdays: preferredWeekdays.toList()..sort(),
+      mapRoutes: mapRoutes,
+      routeActivityLogs: routeActivityLogs,
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
   }
@@ -310,6 +330,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setExperimentalMapEnabled(bool enabled) async {
+    if (experimentalMapEnabled == enabled) return;
+    experimentalMapEnabled = enabled;
+    await _persist();
+    notifyListeners();
+  }
+
   Future<void> setWeeklyWorkoutGoal(int goal) async {
     weeklyWorkoutGoal = goal.clamp(1, 14);
     await _persist();
@@ -386,6 +413,7 @@ class AppState extends ChangeNotifier {
     isSearchExpanded = false;
     focusModeEnabled = true;
     tapAssistEnabled = true;
+    experimentalMapEnabled = false;
     activeExerciseIndex = 0;
     defaultRestSeconds = 90;
     weeklyWorkoutGoal = 3;
@@ -393,6 +421,8 @@ class AppState extends ChangeNotifier {
       ..clear()
       ..addAll(_defaultTemplates());
     plannedWorkouts.clear();
+    mapRoutes.clear();
+    routeActivityLogs.clear();
     preferredWeekdays
       ..clear()
       ..addAll({1, 3, 5});
@@ -539,6 +569,54 @@ class AppState extends ChangeNotifier {
   }
 
   // ---------------------------
+  // Map routes (experimental)
+  // ---------------------------
+
+  Future<void> addMapRoute({
+    required String name,
+    required RouteActivityType activityType,
+    required List<MapPoint> points,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    if (points.length < 2) return;
+    mapRoutes.add(
+      MapRoute(
+        id: _newId(),
+        name: trimmed,
+        activityType: activityType,
+        points: points,
+        createdAt: DateTime.now(),
+      ),
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> deleteMapRoute(String id) async {
+    mapRoutes.removeWhere((r) => r.id == id);
+    routeActivityLogs.removeWhere((l) => l.routeId == id);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> logRouteActivity({
+    required String routeId,
+    required RouteActivityType activityType,
+  }) async {
+    routeActivityLogs.add(
+      RouteActivityLog(
+        id: _newId(),
+        routeId: routeId,
+        activityType: activityType,
+        startedAt: DateTime.now(),
+      ),
+    );
+    await _persist();
+    notifyListeners();
+  }
+
+  // ---------------------------
   // Smart schedule
   // ---------------------------
 
@@ -646,8 +724,11 @@ class AppDb {
     required this.defaultRestSeconds,
     required this.focusModeEnabled,
     required this.tapAssistEnabled,
+    required this.experimentalMapEnabled,
     required this.weeklyWorkoutGoal,
     required this.preferredWeekdays,
+    required this.mapRoutes,
+    required this.routeActivityLogs,
   });
 
   final List<WorkoutSession> sessions;
@@ -656,13 +737,18 @@ class AppDb {
   final int defaultRestSeconds;
   final bool focusModeEnabled;
   final bool tapAssistEnabled;
+  final bool experimentalMapEnabled;
   final int weeklyWorkoutGoal;
   final List<int> preferredWeekdays;
+  final List<MapRoute> mapRoutes;
+  final List<RouteActivityLog> routeActivityLogs;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
     final rawTemplates = (json['routineTemplates'] as List<dynamic>? ?? const []);
     final rawPlans = (json['plannedWorkouts'] as List<dynamic>? ?? const []);
+    final rawRoutes = (json['mapRoutes'] as List<dynamic>? ?? const []);
+    final rawRouteLogs = (json['routeActivityLogs'] as List<dynamic>? ?? const []);
     return AppDb(
       sessions: rawSessions
           .whereType<Map<String, Object?>>()
@@ -679,12 +765,17 @@ class AppDb {
       defaultRestSeconds: (json['defaultRestSeconds'] as num?)?.toInt() ?? 90,
       focusModeEnabled: (json['focusModeEnabled'] as bool?) ?? true,
       tapAssistEnabled: (json['tapAssistEnabled'] as bool?) ?? true,
+      experimentalMapEnabled: (json['experimentalMapEnabled'] as bool?) ?? false,
       weeklyWorkoutGoal: (json['weeklyWorkoutGoal'] as num?)?.toInt() ?? 3,
       preferredWeekdays: (json['preferredWeekdays'] as List<dynamic>? ?? const [])
           .whereType<num>()
           .map((e) => e.toInt())
           .where((d) => d >= 1 && d <= 7)
           .toList(),
+      mapRoutes:
+          rawRoutes.whereType<Map<String, Object?>>().map(MapRoute.fromJson).where((r) => r.points.length >= 2).toList(),
+      routeActivityLogs:
+          rawRouteLogs.whereType<Map<String, Object?>>().map(RouteActivityLog.fromJson).where((l) => l.routeId.isNotEmpty).toList(),
     );
   }
 
@@ -695,8 +786,11 @@ class AppDb {
         'defaultRestSeconds': defaultRestSeconds,
         'focusModeEnabled': focusModeEnabled,
         'tapAssistEnabled': tapAssistEnabled,
+        'experimentalMapEnabled': experimentalMapEnabled,
         'weeklyWorkoutGoal': weeklyWorkoutGoal,
         'preferredWeekdays': preferredWeekdays,
+        'mapRoutes': mapRoutes.map((r) => r.toJson()).toList(),
+        'routeActivityLogs': routeActivityLogs.map((l) => l.toJson()).toList(),
       };
 }
 
@@ -1022,5 +1116,112 @@ extension PlannedWorkoutStatusX on PlannedWorkoutStatus {
         return PlannedWorkoutStatus.planned;
     }
   }
+}
+
+class MapRoute {
+  const MapRoute({
+    required this.id,
+    required this.name,
+    required this.activityType,
+    required this.points,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String name;
+  final RouteActivityType activityType;
+  final List<MapPoint> points;
+  final DateTime createdAt;
+
+  factory MapRoute.fromJson(Map<String, Object?> json) {
+    final rawPts = (json['points'] as List<dynamic>? ?? const []);
+    return MapRoute(
+      id: (json['id'] as String?) ?? '',
+      name: (json['name'] as String?) ?? 'Route',
+      activityType: RouteActivityTypeX.fromString((json['activityType'] as String?) ?? 'walk'),
+      points: rawPts.whereType<Map<String, Object?>>().map(MapPoint.fromJson).toList(),
+      createdAt: DateTime.tryParse((json['createdAt'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'name': name,
+        'activityType': activityType.name,
+        'points': points.map((p) => p.toJson()).toList(),
+        'createdAt': createdAt.toIso8601String(),
+      };
+}
+
+class MapPoint {
+  const MapPoint({required this.lat, required this.lng});
+  final double lat;
+  final double lng;
+
+  factory MapPoint.fromJson(Map<String, Object?> json) {
+    return MapPoint(
+      lat: (json['lat'] as num?)?.toDouble() ?? 0,
+      lng: (json['lng'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  Map<String, Object?> toJson() => {'lat': lat, 'lng': lng};
+}
+
+enum RouteActivityType { walk, jog, bike }
+
+extension RouteActivityTypeX on RouteActivityType {
+  static RouteActivityType fromString(String raw) {
+    switch (raw) {
+      case 'bike':
+        return RouteActivityType.bike;
+      case 'jog':
+        return RouteActivityType.jog;
+      case 'walk':
+      default:
+        return RouteActivityType.walk;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case RouteActivityType.walk:
+        return 'Walk';
+      case RouteActivityType.jog:
+        return 'Jog';
+      case RouteActivityType.bike:
+        return 'Bike';
+    }
+  }
+}
+
+class RouteActivityLog {
+  const RouteActivityLog({
+    required this.id,
+    required this.routeId,
+    required this.activityType,
+    required this.startedAt,
+  });
+
+  final String id;
+  final String routeId;
+  final RouteActivityType activityType;
+  final DateTime startedAt;
+
+  factory RouteActivityLog.fromJson(Map<String, Object?> json) {
+    return RouteActivityLog(
+      id: (json['id'] as String?) ?? '',
+      routeId: (json['routeId'] as String?) ?? '',
+      activityType: RouteActivityTypeX.fromString((json['activityType'] as String?) ?? 'walk'),
+      startedAt: DateTime.tryParse((json['startedAt'] as String?) ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'routeId': routeId,
+        'activityType': activityType.name,
+        'startedAt': startedAt.toIso8601String(),
+      };
 }
 
