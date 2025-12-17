@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import 'map_routes_screen.dart';
+import 'muscle_heat_map_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -172,7 +173,22 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Default rest timer', style: TextStyle(fontWeight: FontWeight.w800)),
+                          const Text('Smart Rest Timer', style: TextStyle(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Automatically adjusts rest time based on exercise type (compound vs isolation).',
+                            style: TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                          const SizedBox(height: 10),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: app.smartRestEnabled,
+                            onChanged: (v) => app.setSmartRestEnabled(v),
+                            title: const Text('Enable Smart Rest'),
+                            subtitle: const Text('Compound: 2:30 • Isolation: 1:15'),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text('Default rest timer (when Smart Rest is off)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                           const SizedBox(height: 6),
                           Text(
                             '${app.defaultRestSeconds}s',
@@ -186,8 +202,30 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                             onChanged: (v) => app.setDefaultRestSeconds(v.round()),
                           ),
                           const Text(
-                            'Tip: tap the Dynamic Island to start quick rests anytime.',
+                            'Tip: swipe down on the Dynamic Island to start a quick rest.',
                             style: TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Superset Mode', style: TextStyle(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Auto-cycle between paired exercises after logging each set. Great for supersets and circuits.',
+                            style: TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                          const SizedBox(height: 10),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: app.supersetModeEnabled,
+                            onChanged: (v) => app.setSupersetModeEnabled(v),
+                            title: const Text('Enable Superset Mode'),
+                            subtitle: const Text('Cyan glow when active • Long-press exercises to pair'),
                           ),
                         ],
                       ),
@@ -281,6 +319,40 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                                 : null,
                             icon: const Icon(Icons.map_outlined),
                             label: const Text('Open Map'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _Card(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Muscle Heat Map (experimental)', style: TextStyle(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Visualize muscle fatigue and training volume. Compare your strength to average lifters with similar profile.',
+                            style: TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                          const SizedBox(height: 10),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: app.experimentalHeatMapEnabled,
+                            onChanged: (v) => app.setExperimentalHeatMapEnabled(v),
+                            title: const Text('Enable Heat Map'),
+                            subtitle: const Text('Track muscle recovery & progress.'),
+                          ),
+                          const SizedBox(height: 10),
+                          FilledButton.tonalIcon(
+                            onPressed: app.experimentalHeatMapEnabled
+                                ? () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (_) => const MuscleHeatMapScreen()),
+                                    );
+                                  }
+                                : null,
+                            icon: const Icon(Icons.local_fire_department_outlined),
+                            label: const Text('Open Heat Map'),
                           ),
                         ],
                       ),
