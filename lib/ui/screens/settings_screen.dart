@@ -82,6 +82,28 @@ class SettingsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Dynamic Island Focus Mode', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                const Text(
+                  'When a workout is active, the Island morphs into a quick logger (one-tap “Add set”).',
+                  style: TextStyle(color: Color(0xAAFFFFFF)),
+                ),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: app.focusModeEnabled,
+                  onChanged: (v) => app.setFocusModeEnabled(v),
+                  title: const Text('Enable Focus Mode'),
+                  subtitle: const Text('Green glow = active workout • Amber glow = rest timer'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 const Text('Default rest timer', style: TextStyle(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
                 Text(

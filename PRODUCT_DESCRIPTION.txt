@@ -8,6 +8,8 @@ Core Features Implemented
   - A centered “pill” overlay at the top of the screen.
   - Tap to expand into a smart search panel.
   - Shows an always-available rest timer in compact mode.
+  - Focus Mode: when a workout is active, the Island morphs into a quick logger (one-tap “Add set”).
+  - Subtle state lighting: green glow for active workout logging, amber glow for rest timer.
 
 - Workout tracker (live session)
   - Start a workout session.

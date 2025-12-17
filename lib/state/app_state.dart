@@ -24,6 +24,12 @@ class AppState extends ChangeNotifier {
   /// Active workout session (not yet saved).
   WorkoutSessionDraft? activeSession;
 
+  /// Focus mode: Dynamic Island becomes a quick logger during workouts.
+  bool focusModeEnabled = true;
+
+  /// Which exercise is currently “focused” for fast logging.
+  int activeExerciseIndex = 0;
+
   /// Saved sessions.
   final List<WorkoutSession> sessions = [];
 
@@ -70,6 +76,7 @@ class AppState extends ChangeNotifier {
           ..clear()
           ..addAll(db.sessions);
         defaultRestSeconds = db.defaultRestSeconds;
+        focusModeEnabled = db.focusModeEnabled;
         preferredWeekdays
           ..clear()
           ..addAll(db.preferredWeekdays);
@@ -87,6 +94,7 @@ class AppState extends ChangeNotifier {
     final db = AppDb(
       sessions: sessions,
       defaultRestSeconds: defaultRestSeconds,
+      focusModeEnabled: focusModeEnabled,
       preferredWeekdays: preferredWeekdays.toList()..sort(),
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
@@ -109,6 +117,7 @@ class AppState extends ChangeNotifier {
       startedAt: DateTime.now(),
       title: title?.trim().isEmpty ?? true ? 'Workout' : title!.trim(),
     );
+    activeExerciseIndex = 0;
     notifyListeners();
   }
 
@@ -136,6 +145,7 @@ class AppState extends ChangeNotifier {
   void discardActiveWorkout() {
     activeSession = null;
     stopRestTimer();
+    activeExerciseIndex = 0;
     notifyListeners();
   }
 
@@ -145,6 +155,7 @@ class AppState extends ChangeNotifier {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     draft.exercises.add(ExerciseDraft(name: trimmed));
+    activeExerciseIndex = draft.exercises.length - 1;
     notifyListeners();
   }
 
@@ -156,6 +167,7 @@ class AppState extends ChangeNotifier {
     draft.exercises[exerciseIndex].sets.add(
           ExerciseSet(reps: reps, weight: weight, unit: unit ?? 'kg'),
         );
+    activeExerciseIndex = exerciseIndex;
     notifyListeners();
   }
 
@@ -164,6 +176,13 @@ class AppState extends ChangeNotifier {
     if (draft == null) return;
     if (exerciseIndex < 0 || exerciseIndex >= draft.exercises.length) return;
     draft.exercises.removeAt(exerciseIndex);
+    if (draft.exercises.isEmpty) {
+      activeExerciseIndex = 0;
+    } else if (activeExerciseIndex >= draft.exercises.length) {
+      activeExerciseIndex = draft.exercises.length - 1;
+    } else if (exerciseIndex <= activeExerciseIndex && activeExerciseIndex > 0) {
+      activeExerciseIndex -= 1;
+    }
     notifyListeners();
   }
 
@@ -174,6 +193,7 @@ class AppState extends ChangeNotifier {
     final ex = draft.exercises[exerciseIndex];
     if (setIndex < 0 || setIndex >= ex.sets.length) return;
     ex.sets.removeAt(setIndex);
+    activeExerciseIndex = exerciseIndex;
     notifyListeners();
   }
 
@@ -226,6 +246,57 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setFocusModeEnabled(bool enabled) async {
+    if (focusModeEnabled == enabled) return;
+    focusModeEnabled = enabled;
+    await _persist();
+    notifyListeners();
+  }
+
+  void setActiveExerciseIndex(int index) {
+    final draft = activeSession;
+    if (draft == null) return;
+    if (draft.exercises.isEmpty) return;
+    final clamped = index.clamp(0, draft.exercises.length - 1);
+    if (activeExerciseIndex == clamped) return;
+    activeExerciseIndex = clamped;
+    notifyListeners();
+  }
+
+  /// One-tap logging: adds a set to the active exercise using last-set defaults.
+  ///
+  /// Returns info to support an "Undo" action.
+  QuickSetAdded? addQuickSetToActive() {
+    final draft = activeSession;
+    if (draft == null) return null;
+    if (draft.exercises.isEmpty) return null;
+
+    final exIndex = activeExerciseIndex.clamp(0, draft.exercises.length - 1);
+    final ex = draft.exercises[exIndex];
+
+    final last = ex.sets.isEmpty ? null : ex.sets.last;
+    final next = ExerciseSet(
+      reps: (last?.reps ?? 10).clamp(1, 999),
+      weight: last?.weight ?? 0,
+      unit: last?.unit ?? 'kg',
+    );
+    ex.sets.add(next);
+
+    notifyListeners();
+    return QuickSetAdded(exerciseIndex: exIndex, setIndex: ex.sets.length - 1);
+  }
+
+  bool undoQuickSet(QuickSetAdded added) {
+    final draft = activeSession;
+    if (draft == null) return false;
+    if (added.exerciseIndex < 0 || added.exerciseIndex >= draft.exercises.length) return false;
+    final ex = draft.exercises[added.exerciseIndex];
+    if (added.setIndex < 0 || added.setIndex >= ex.sets.length) return false;
+    ex.sets.removeAt(added.setIndex);
+    notifyListeners();
+    return true;
+  }
+
   Future<void> setDefaultRestSeconds(int seconds) async {
     defaultRestSeconds = seconds.clamp(10, 600);
     await _persist();
@@ -248,6 +319,8 @@ class AppState extends ChangeNotifier {
     stopRestTimer();
     searchQuery = '';
     isSearchExpanded = false;
+    focusModeEnabled = true;
+    activeExerciseIndex = 0;
     defaultRestSeconds = 90;
     preferredWeekdays
       ..clear()
@@ -368,11 +441,13 @@ class AppDb {
   const AppDb({
     required this.sessions,
     required this.defaultRestSeconds,
+    required this.focusModeEnabled,
     required this.preferredWeekdays,
   });
 
   final List<WorkoutSession> sessions;
   final int defaultRestSeconds;
+  final bool focusModeEnabled;
   final List<int> preferredWeekdays;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
@@ -383,6 +458,7 @@ class AppDb {
           .map(WorkoutSession.fromJson)
           .toList(),
       defaultRestSeconds: (json['defaultRestSeconds'] as num?)?.toInt() ?? 90,
+      focusModeEnabled: (json['focusModeEnabled'] as bool?) ?? true,
       preferredWeekdays: (json['preferredWeekdays'] as List<dynamic>? ?? const [])
           .whereType<num>()
           .map((e) => e.toInt())
@@ -394,8 +470,15 @@ class AppDb {
   Map<String, Object?> toJson() => {
         'sessions': sessions.map((s) => s.toJson()).toList(),
         'defaultRestSeconds': defaultRestSeconds,
+        'focusModeEnabled': focusModeEnabled,
         'preferredWeekdays': preferredWeekdays,
       };
+}
+
+class QuickSetAdded {
+  const QuickSetAdded({required this.exerciseIndex, required this.setIndex});
+  final int exerciseIndex;
+  final int setIndex;
 }
 
 class WorkoutSessionDraft {
