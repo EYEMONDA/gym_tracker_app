@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import '../screens/log_screen.dart';
@@ -13,16 +14,46 @@ class DynamicIsland extends StatefulWidget {
   State<DynamicIsland> createState() => _DynamicIslandState();
 }
 
-class _DynamicIslandState extends State<DynamicIsland> {
+class _DynamicIslandState extends State<DynamicIsland> with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool _showFocusPanel = true;
+  bool _showStreakCelebration = false;
+  int? _lastStreakCelebrated;
+  
+  // Animation controller for morphing effects
+  late AnimationController _morphController;
+  late Animation<double> _morphAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _morphController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _morphAnimation = CurvedAnimation(
+      parent: _morphController,
+      curve: Curves.easeOutBack,
+    );
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    _morphController.dispose();
     super.dispose();
+  }
+
+  void _triggerStreakCelebration(int streak) {
+    if (_lastStreakCelebrated == streak) return;
+    _lastStreakCelebrated = streak;
+    setState(() => _showStreakCelebration = true);
+    HapticFeedback.mediumImpact();
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showStreakCelebration = false);
+    });
   }
 
   String _formatMMSS(Duration d) {
@@ -32,11 +63,47 @@ class _DynamicIslandState extends State<DynamicIsland> {
     return '$m:$s';
   }
 
-  Color _accentFor({required bool workoutActive, required bool restRunning, required bool searching}) {
+  Color _accentFor({
+    required bool workoutActive,
+    required bool restRunning,
+    required bool searching,
+    required bool supersetMode,
+    required bool progressReady,
+  }) {
+    if (_showStreakCelebration) return const Color(0xFFFF6B35); // Orange for celebration
+    if (progressReady) return const Color(0xFFFFD700); // Gold for progress nudge
     if (searching) return const Color(0xFF7C7CFF);
+    if (supersetMode && workoutActive) return const Color(0xFF00E5FF); // Cyan for superset
     if (workoutActive) return const Color(0xFF00D17A);
     if (restRunning) return const Color(0xFFFFB020);
     return const Color(0xFFFFFFFF);
+  }
+
+  /// Get contextual state label for the island
+  String _getContextualLabel(AppState app) {
+    if (_showStreakCelebration) {
+      final streak = app.currentStreak;
+      if (streak >= 7) return '🔥 $streak-day streak!';
+      if (streak >= 3) return '🔥 $streak days in a row!';
+      return '💪 Keep it up!';
+    }
+    
+    final now = DateTime.now();
+    final lastSession = app.sessions.isEmpty ? null : app.sessions.first;
+    final daysSinceLast = lastSession == null 
+        ? null 
+        : DateTime(now.year, now.month, now.day)
+            .difference(DateTime(lastSession.startedAt.year, lastSession.startedAt.month, lastSession.startedAt.day))
+            .inDays;
+
+    if (app.activeSession == null) {
+      // Pre-workout states
+      if (daysSinceLast == 0) return 'Rest day 💤';
+      if (daysSinceLast == null || daysSinceLast > 3) return 'Ready to train?';
+      return 'Search';
+    }
+    
+    return 'Search';
   }
 
   String _formatSetLine(ExerciseSet s) {
@@ -54,6 +121,25 @@ class _DynamicIslandState extends State<DynamicIsland> {
     final workoutActive = app.activeSession != null;
     final focusMode = app.focusModeEnabled;
     final tapAssist = app.tapAssistEnabled;
+    final supersetMode = app.supersetModeEnabled;
+
+    // Check for streak celebration trigger (when reaching milestones)
+    final streak = app.currentStreak;
+    final workoutsThisWeek = app.workoutsThisWeek;
+    if (workoutsThisWeek >= app.weeklyWorkoutGoal && streak >= 3 && !_showStreakCelebration) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _triggerStreakCelebration(streak);
+      });
+    }
+
+    // Check for progressive overload opportunity
+    bool progressReady = false;
+    if (workoutActive && app.activeSession!.exercises.isNotEmpty) {
+      final exIndex = app.activeExerciseIndex.clamp(0, app.activeSession!.exercises.length - 1);
+      final ex = app.activeSession!.exercises[exIndex];
+      final suggestion = app.getProgressiveOverloadSuggestion(ex.name);
+      progressReady = suggestion != null;
+    }
 
     // Keep controller aligned when state changes from elsewhere.
     if (_controller.text != app.searchQuery) {
@@ -69,7 +155,7 @@ class _DynamicIslandState extends State<DynamicIsland> {
     final expanded = app.isSearchExpanded;
 
     final baseHeight = 42.0;
-    final expandedHeight = min(260.0, size.height * 0.35);
+    final expandedHeight = min(320.0, size.height * 0.42);
     final height = expanded ? expandedHeight : baseHeight;
     final width = expanded ? maxWidth : collapsedWidth;
 
@@ -78,6 +164,8 @@ class _DynamicIslandState extends State<DynamicIsland> {
       workoutActive: workoutActive && focusMode,
       restRunning: rest.isRunning,
       searching: expanded && !_showFocusPanel,
+      supersetMode: supersetMode,
+      progressReady: progressReady,
     );
 
     // Keep panel choice sensible.
@@ -88,7 +176,54 @@ class _DynamicIslandState extends State<DynamicIsland> {
     final double iconMin = tapAssist ? 48 : 32;
     final double iconPad = tapAssist ? 10 : 0;
 
-    return AnimatedContainer(
+    return GestureDetector(
+      // Gesture-based quick actions
+      onVerticalDragEnd: (details) {
+        if (expanded) return;
+        if (details.primaryVelocity == null) return;
+        
+        if (details.primaryVelocity! > 200) {
+          // Swipe down: start rest timer
+          if (!rest.isRunning) {
+            HapticFeedback.lightImpact();
+            if (workoutActive && app.activeSession!.exercises.isNotEmpty) {
+              final exIndex = app.activeExerciseIndex.clamp(0, app.activeSession!.exercises.length - 1);
+              final ex = app.activeSession!.exercises[exIndex];
+              final smartSeconds = app.getSmartRestSeconds(ex.name);
+              app.startRestTimer(seconds: smartSeconds);
+            } else {
+              app.startRestTimer();
+            }
+          }
+        } else if (details.primaryVelocity! < -200) {
+          // Swipe up: open focus logger
+          HapticFeedback.lightImpact();
+          app.setSearchExpanded(true);
+          if (workoutActive && focusMode) {
+            setState(() => _showFocusPanel = true);
+          }
+        }
+      },
+      onHorizontalDragEnd: (details) {
+        if (expanded) return;
+        if (!workoutActive || app.activeSession!.exercises.isEmpty) return;
+        if (details.primaryVelocity == null) return;
+        
+        final exercises = app.activeSession!.exercises;
+        if (details.primaryVelocity!.abs() > 200) {
+          HapticFeedback.selectionClick();
+          if (details.primaryVelocity! > 0) {
+            // Swipe right: previous exercise
+            final newIndex = (app.activeExerciseIndex - 1).clamp(0, exercises.length - 1);
+            app.setActiveExerciseIndex(newIndex);
+          } else {
+            // Swipe left: next exercise
+            final newIndex = (app.activeExerciseIndex + 1).clamp(0, exercises.length - 1);
+            app.setActiveExerciseIndex(newIndex);
+          }
+        }
+      },
+      child: AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       width: width,
@@ -189,6 +324,7 @@ class _DynamicIslandState extends State<DynamicIsland> {
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -227,16 +363,43 @@ class _TopRow extends StatelessWidget {
     final rest = app.restTimer;
     final workoutActive = app.activeSession != null;
     final hasExercises = (app.activeSession?.exercises.isNotEmpty ?? false);
+    final supersetMode = app.supersetModeEnabled;
 
     final canShowFocusCollapsed = !expanded && focusMode && workoutActive && hasExercises;
     final ex = canShowFocusCollapsed ? app.activeSession!.exercises[app.activeExerciseIndex.clamp(0, app.activeSession!.exercises.length - 1)] : null;
     final nextSetNumber = ex == null ? 1 : ex.sets.length + 1;
+    
+    // Check for progressive overload opportunity
+    final progressSuggestion = ex != null ? app.getProgressiveOverloadSuggestion(ex.name) : null;
+    final showProgressNudge = progressSuggestion != null;
+    
+    // Get smart rest time for current exercise
+    final smartRestLabel = ex != null && app.smartRestEnabled 
+        ? (app.isCompoundExercise(ex.name) ? '⏱ 2:30' : '⏱ 1:15')
+        : null;
+
+    // Build collapsed label with contextual info
+    String collapsedLabel;
+    if (canShowFocusCollapsed) {
+      if (showProgressNudge) {
+        final s = progressSuggestion!;
+        collapsedLabel = '📈 ${ex!.name} • +${s.suggestedWeight - s.currentWeight}${s.unit}?';
+      } else if (supersetMode && app.supersetPairedIndices.contains(app.activeExerciseIndex)) {
+        collapsedLabel = '🔄 ${ex!.name} • Set $nextSetNumber';
+      } else {
+        collapsedLabel = '${ex!.name} • Set $nextSetNumber';
+      }
+    } else if (showRest) {
+      collapsedLabel = smartRestLabel != null ? 'Rest $restText $smartRestLabel' : 'Rest $restText';
+    } else {
+      collapsedLabel = app.searchQuery.trim().isEmpty ? 'Search' : app.searchQuery;
+    }
 
     return Row(
       children: [
         Icon(
           canShowFocusCollapsed
-              ? Icons.fitness_center
+              ? (showProgressNudge ? Icons.trending_up : (supersetMode ? Icons.sync : Icons.fitness_center))
               : (showRest ? Icons.timer : Icons.search),
           size: 18,
           color: canShowFocusCollapsed ? accent.withOpacity(0.95) : Colors.white.withOpacity(0.9),
@@ -248,7 +411,7 @@ class _TopRow extends StatelessWidget {
             child: expanded
                 ? (focusMode && workoutActive && focusPanel
                     ? Text(
-                        'Focus logger',
+                        supersetMode ? 'Focus logger (Superset)' : 'Focus logger',
                         key: const ValueKey('dynamic_island_focus_title'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -256,13 +419,15 @@ class _TopRow extends StatelessWidget {
                       )
                     : searchField)
                 : Text(
-                    canShowFocusCollapsed
-                        ? '${ex!.name} • Set $nextSetNumber'
-                        : (showRest ? 'Rest $restText' : (app.searchQuery.trim().isEmpty ? 'Search' : app.searchQuery)),
-                    key: const ValueKey('dynamic_island_title'),
+                    collapsedLabel,
+                    key: ValueKey('dynamic_island_title_$collapsedLabel'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: showProgressNudge ? const Color(0xFFFFD700) : Colors.white, 
+                      fontSize: 14, 
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
           ),
         ),
@@ -273,7 +438,18 @@ class _TopRow extends StatelessWidget {
             style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
           ),
         if (expanded) ...[
-          if (focusMode && workoutActive)
+          if (focusMode && workoutActive) ...[
+            IconButton(
+              tooltip: supersetMode ? 'Superset Off' : 'Superset Mode',
+              padding: EdgeInsets.all(tapAssistPadding),
+              constraints: BoxConstraints(minWidth: tapAssistMinSize, minHeight: tapAssistMinSize),
+              icon: Icon(
+                Icons.sync, 
+                size: 18, 
+                color: supersetMode ? const Color(0xFF00E5FF) : Colors.white54,
+              ),
+              onPressed: () => app.setSupersetModeEnabled(!supersetMode),
+            ),
             IconButton(
               tooltip: focusPanel ? 'Search' : 'Focus',
               padding: EdgeInsets.all(tapAssistPadding),
@@ -281,6 +457,7 @@ class _TopRow extends StatelessWidget {
               icon: Icon(focusPanel ? Icons.search : Icons.fitness_center, size: 18),
               onPressed: () => onTogglePanel(!focusPanel),
             ),
+          ],
           IconButton(
             tooltip: 'Close',
             padding: EdgeInsets.all(tapAssistPadding),
@@ -290,17 +467,27 @@ class _TopRow extends StatelessWidget {
           ),
         ] else if (canShowFocusCollapsed)
           IconButton(
-            tooltip: 'Add set',
+            tooltip: showProgressNudge ? 'Add heavier set' : 'Add set',
             padding: EdgeInsets.all(tapAssistPadding),
             constraints: BoxConstraints(minWidth: tapAssistMinSize, minHeight: tapAssistMinSize),
-            icon: Icon(Icons.add_circle, size: 18, color: accent.withOpacity(0.95)),
+            icon: Icon(
+              showProgressNudge ? Icons.arrow_circle_up : Icons.add_circle, 
+              size: 18, 
+              color: accent.withOpacity(0.95),
+            ),
             onPressed: () {
               final added = app.addQuickSetToActive();
               if (added == null) return;
-              app.startRestTimer();
+              // Use smart rest based on exercise type
+              final smartSeconds = app.getSmartRestSeconds(ex!.name);
+              app.startRestTimer(seconds: smartSeconds);
+              
+              final supersetInfo = supersetMode && app.supersetPairedIndices.length >= 2 
+                  ? ' → Next exercise' 
+                  : '';
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Added set $nextSetNumber • ${ex!.name}'),
+                  content: Text('Added set $nextSetNumber • ${ex.name}$supersetInfo'),
                   duration: const Duration(seconds: 2),
                   action: SnackBarAction(
                     label: 'Undo',
@@ -340,31 +527,82 @@ class _FocusLoggerPanel extends StatelessWidget {
     final exIndex = app.activeExerciseIndex.clamp(0, session.exercises.length - 1);
     final ex = session.exercises[exIndex];
     final last = ex.sets.isEmpty ? null : ex.sets.last;
+    final supersetMode = app.supersetModeEnabled;
+    
+    // Check for progressive overload
+    final progressSuggestion = app.getProgressiveOverloadSuggestion(ex.name);
+    final isCompound = app.isCompoundExercise(ex.name);
+    final smartRestSeconds = app.getSmartRestSeconds(ex.name);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Exercise chips with superset indicators
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: List.generate(session.exercises.length, (i) {
             final e = session.exercises[i];
-            return ChoiceChip(
-              selected: i == exIndex,
-              label: Text(e.name, overflow: TextOverflow.ellipsis),
-              onSelected: (_) => app.setActiveExerciseIndex(i),
+            final isInSuperset = app.supersetPairedIndices.contains(i);
+            return GestureDetector(
+              onLongPress: supersetMode ? () {
+                HapticFeedback.selectionClick();
+                app.toggleSupersetExercise(i);
+              } : null,
+              child: ChoiceChip(
+                selected: i == exIndex,
+                avatar: supersetMode && isInSuperset 
+                    ? const Icon(Icons.sync, size: 14, color: Color(0xFF00E5FF))
+                    : null,
+                label: Text(e.name, overflow: TextOverflow.ellipsis),
+                onSelected: (_) => app.setActiveExerciseIndex(i),
+              ),
             );
           }),
         ),
+        if (supersetMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Long-press exercises to pair for superset',
+              style: TextStyle(color: const Color(0xFF00E5FF).withOpacity(0.7), fontSize: 11),
+            ),
+          ),
         const SizedBox(height: 10),
-        if (last != null)
+        
+        // Last set info with progress suggestion
+        if (progressSuggestion != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD700).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.trending_up, size: 16, color: Color(0xFFFFD700)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '📈 Ready to progress: ${progressSuggestion.currentWeight} → ${progressSuggestion.suggestedWeight} ${progressSuggestion.unit}',
+                    style: const TextStyle(color: Color(0xFFFFD700), fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (last != null)
           Text(
-            'Last: ${formatSetLine(last)}',
+            'Last: ${formatSetLine(last)}${isCompound ? " (compound)" : ""}',
             style: const TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
           )
         else
           const Text('Last: none yet', style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 12)),
         const SizedBox(height: 10),
+        
+        // Main action row
         Row(
           children: [
             Expanded(
@@ -372,10 +610,13 @@ class _FocusLoggerPanel extends StatelessWidget {
                 onPressed: () {
                   final added = app.addQuickSetToActive();
                   if (added == null) return;
-                  app.startRestTimer();
+                  app.startRestTimer(seconds: smartRestSeconds);
+                  final supersetInfo = supersetMode && app.supersetPairedIndices.length >= 2 
+                      ? ' → Next' 
+                      : '';
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Added set • ${ex.name}'),
+                      content: Text('Added set • ${ex.name}$supersetInfo'),
                       duration: const Duration(seconds: 2),
                       action: SnackBarAction(
                         label: 'Undo',
@@ -391,25 +632,53 @@ class _FocusLoggerPanel extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             OutlinedButton.icon(
-              onPressed: () => app.startRestTimer(),
+              onPressed: () => app.startRestTimer(seconds: smartRestSeconds),
               icon: const Icon(Icons.timer),
-              label: const Text('Rest'),
+              label: Text('Rest ${smartRestSeconds ~/ 60}:${(smartRestSeconds % 60).toString().padLeft(2, '0')}'),
             ),
           ],
         ),
         const SizedBox(height: 10),
+        
+        // Warm-up and Save row
         Row(
           children: [
+            // Warm-up sets button (only show if no sets yet)
+            if (ex.sets.isEmpty && last == null)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final result = await showDialog<_WarmupConfig>(
+                      context: context,
+                      builder: (_) => const _WarmupDialog(),
+                    );
+                    if (result == null) return;
+                    app.addWarmupSetsToExercise(exIndex, result.workingWeight, result.unit);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Added 3 warm-up sets')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.wb_sunny_outlined, size: 18),
+                  label: const Text('Warm-up'),
+                ),
+              )
+            else
+              const SizedBox.shrink(),
+            if (ex.sets.isEmpty && last == null) const SizedBox(width: 10),
             Expanded(
-              child: FilledButton.tonalIcon(
-                onPressed: () async {
+              child: _MorphingSaveButton(
+                totalSets: session.exercises.fold(0, (sum, e) => sum + e.sets.length),
+                onSave: () async {
                   await app.endWorkoutAndSave();
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Workout saved.')));
+                    HapticFeedback.heavyImpact();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('💪 Great workout! Saved.')),
+                    );
                   }
                 },
-                icon: const Icon(Icons.check),
-                label: const Text('Save workout'),
               ),
             ),
           ],
@@ -432,6 +701,121 @@ class _FocusLoggerPanel extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Morphing save button that grows more prominent as sets are logged
+class _MorphingSaveButton extends StatelessWidget {
+  const _MorphingSaveButton({
+    required this.totalSets,
+    required this.onSave,
+  });
+
+  final int totalSets;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    // Button morphs based on workout progress
+    final hasContent = totalSets > 0;
+    final isSubstantial = totalSets >= 3;
+    
+    final buttonColor = isSubstantial 
+        ? const Color(0xFF00D17A) 
+        : (hasContent ? const Color(0xFF00D17A).withOpacity(0.7) : null);
+    
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      child: FilledButton.tonalIcon(
+        onPressed: onSave,
+        icon: Icon(
+          isSubstantial ? Icons.check_circle : Icons.check,
+          color: isSubstantial ? Colors.black87 : null,
+        ),
+        label: Text(
+          isSubstantial ? 'Save workout 💪' : 'Save',
+          style: TextStyle(
+            fontWeight: isSubstantial ? FontWeight.w800 : FontWeight.w600,
+            color: isSubstantial ? Colors.black87 : null,
+          ),
+        ),
+        style: isSubstantial 
+            ? FilledButton.styleFrom(backgroundColor: buttonColor)
+            : null,
+      ),
+    );
+  }
+}
+
+/// Dialog for configuring warm-up sets
+class _WarmupDialog extends StatefulWidget {
+  const _WarmupDialog();
+
+  @override
+  State<_WarmupDialog> createState() => _WarmupDialogState();
+}
+
+class _WarmupDialogState extends State<_WarmupDialog> {
+  final TextEditingController _weight = TextEditingController(text: '60');
+  String _unit = 'kg';
+
+  @override
+  void dispose() {
+    _weight.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add warm-up sets'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Enter your working weight. We\'ll add:\n• 50% × 10 reps\n• 70% × 5 reps\n• 85% × 3 reps',
+            style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _weight,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Working weight'),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: _unit,
+            items: const [
+              DropdownMenuItem(value: 'kg', child: Text('kg')),
+              DropdownMenuItem(value: 'lb', child: Text('lb')),
+            ],
+            onChanged: (v) => setState(() => _unit = v ?? 'kg'),
+            decoration: const InputDecoration(labelText: 'Unit'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final w = double.tryParse(_weight.text.replaceAll(',', '.')) ?? 60;
+            Navigator.pop(context, _WarmupConfig(workingWeight: w, unit: _unit));
+          },
+          child: const Text('Add warm-ups'),
+        ),
+      ],
+    );
+  }
+}
+
+class _WarmupConfig {
+  const _WarmupConfig({required this.workingWeight, required this.unit});
+  final double workingWeight;
+  final String unit;
 }
 
 class _SearchPanel extends StatelessWidget {

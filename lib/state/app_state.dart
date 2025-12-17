@@ -76,6 +76,23 @@ class AppState extends ChangeNotifier {
   /// 1=Mon ... 7=Sun (DateTime.weekday)
   final Set<int> preferredWeekdays = {1, 3, 5};
 
+  /// Superset mode: auto-cycle to next exercise after logging a set.
+  bool supersetModeEnabled = false;
+
+  /// Exercises paired for superset (indices in active session).
+  List<int> supersetPairedIndices = [];
+
+  /// Smart rest: auto-adjust rest time based on exercise type.
+  bool smartRestEnabled = true;
+
+  /// Compound exercises that warrant longer rest times.
+  static const compoundExercises = {
+    'squat', 'deadlift', 'bench press', 'bench', 'overhead press', 'ohp',
+    'barbell row', 'row', 'pull-up', 'pullup', 'chin-up', 'chinup',
+    'leg press', 'romanian deadlift', 'rdl', 'hip thrust', 'dip', 'dips',
+    'clean', 'snatch', 'front squat', 'back squat', 'military press',
+  };
+
   bool get loaded => _loaded;
 
   Future<void> load() async {
@@ -123,6 +140,8 @@ class AppState extends ChangeNotifier {
         routeActivityLogs
           ..clear()
           ..addAll(db.routeActivityLogs);
+        supersetModeEnabled = db.supersetModeEnabled;
+        smartRestEnabled = db.smartRestEnabled;
       } catch (_) {
         // If the DB is corrupt, keep the app usable.
       }
@@ -152,6 +171,8 @@ class AppState extends ChangeNotifier {
       preferredWeekdays: preferredWeekdays.toList()..sort(),
       mapRoutes: mapRoutes,
       routeActivityLogs: routeActivityLogs,
+      supersetModeEnabled: supersetModeEnabled,
+      smartRestEnabled: smartRestEnabled,
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
   }
@@ -356,7 +377,11 @@ class AppState extends ChangeNotifier {
   /// One-tap logging: adds a set to the active exercise using last-set defaults.
   ///
   /// Returns info to support an "Undo" action.
-  QuickSetAdded? addQuickSetToActive() {
+  /// One-tap logging: adds a set to the active exercise using last-set defaults.
+  ///
+  /// Returns info to support an "Undo" action.
+  /// If superset mode is enabled, auto-cycles to next paired exercise.
+  QuickSetAdded? addQuickSetToActive({bool startSmartRest = false}) {
     final draft = activeSession;
     if (draft == null) return null;
     if (draft.exercises.isEmpty) return null;
@@ -373,8 +398,19 @@ class AppState extends ChangeNotifier {
     );
     ex.sets.add(next);
 
+    final added = QuickSetAdded(exerciseIndex: exIndex, setIndex: ex.sets.length - 1);
+
+    // Auto-cycle in superset mode
+    if (supersetModeEnabled && supersetPairedIndices.length >= 2) {
+      final currentPosInSuperset = supersetPairedIndices.indexOf(exIndex);
+      if (currentPosInSuperset != -1) {
+        final nextPosInSuperset = (currentPosInSuperset + 1) % supersetPairedIndices.length;
+        activeExerciseIndex = supersetPairedIndices[nextPosInSuperset];
+      }
+    }
+
     notifyListeners();
-    return QuickSetAdded(exerciseIndex: exIndex, setIndex: ex.sets.length - 1);
+    return added;
   }
 
   bool undoQuickSet(QuickSetAdded added) {
@@ -391,6 +427,152 @@ class AppState extends ChangeNotifier {
   Future<void> setDefaultRestSeconds(int seconds) async {
     defaultRestSeconds = seconds.clamp(10, 600);
     await _persist();
+    notifyListeners();
+  }
+
+  Future<void> setSupersetModeEnabled(bool enabled) async {
+    if (supersetModeEnabled == enabled) return;
+    supersetModeEnabled = enabled;
+    if (!enabled) supersetPairedIndices = [];
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> setSmartRestEnabled(bool enabled) async {
+    if (smartRestEnabled == enabled) return;
+    smartRestEnabled = enabled;
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Toggle an exercise index in/out of the superset pair list.
+  void toggleSupersetExercise(int index) {
+    if (supersetPairedIndices.contains(index)) {
+      supersetPairedIndices.remove(index);
+    } else {
+      supersetPairedIndices.add(index);
+    }
+    notifyListeners();
+  }
+
+  /// Check if an exercise name is a compound lift (warrants longer rest).
+  bool isCompoundExercise(String name) {
+    final lower = name.trim().toLowerCase();
+    return compoundExercises.any((c) => lower.contains(c));
+  }
+
+  /// Get smart rest duration based on exercise type.
+  int getSmartRestSeconds(String exerciseName) {
+    if (!smartRestEnabled) return defaultRestSeconds;
+    return isCompoundExercise(exerciseName) ? 150 : 75; // 2.5min vs 1.25min
+  }
+
+  /// Calculate current workout streak (consecutive days with workouts).
+  int get currentStreak {
+    if (sessions.isEmpty) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Get unique workout days, sorted descending
+    final workoutDays = sessions
+        .map((s) => DateTime(s.startedAt.year, s.startedAt.month, s.startedAt.day))
+        .toSet()
+        .toList()
+      ..sort((a, b) => b.compareTo(a));
+    
+    if (workoutDays.isEmpty) return 0;
+    
+    // Check if most recent workout was today or yesterday
+    final mostRecent = workoutDays.first;
+    final daysSinceLast = today.difference(mostRecent).inDays;
+    if (daysSinceLast > 1) return 0; // Streak broken
+    
+    int streak = 1;
+    for (int i = 1; i < workoutDays.length; i++) {
+      final prev = workoutDays[i - 1];
+      final curr = workoutDays[i];
+      final gap = prev.difference(curr).inDays;
+      if (gap == 1) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  /// Get workouts this week count.
+  int get workoutsThisWeek {
+    final now = DateTime.now();
+    final startOfWeek = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    return sessions.where((s) => !s.startedAt.isBefore(startOfWeek)).length;
+  }
+
+  /// Check if user should be nudged to increase weight for an exercise.
+  /// Returns suggested weight increase if ready, null otherwise.
+  ProgressiveOverloadSuggestion? getProgressiveOverloadSuggestion(String exerciseName) {
+    final name = exerciseName.trim().toLowerCase();
+    if (name.isEmpty) return null;
+    
+    // Look at last 2 sessions with this exercise
+    final relevantSessions = sessions
+        .where((s) => s.exercises.any((e) => e.name.toLowerCase() == name))
+        .take(2)
+        .toList();
+    
+    if (relevantSessions.isEmpty) return null;
+    
+    final lastSession = relevantSessions.first;
+    final exercise = lastSession.exercises.firstWhere(
+      (e) => e.name.toLowerCase() == name,
+    );
+    
+    if (exercise.sets.isEmpty) return null;
+    
+    // Check if user completed 3+ sets at same weight with good reps (8+)
+    final workingSets = exercise.sets.where((s) => s.weight > 0).toList();
+    if (workingSets.length < 3) return null;
+    
+    final weight = workingSets.first.weight;
+    final unit = workingSets.first.unit;
+    final allSameWeight = workingSets.every((s) => s.weight == weight);
+    final allGoodReps = workingSets.every((s) => s.reps >= 8);
+    
+    if (allSameWeight && allGoodReps) {
+      final increment = unit == 'lb' ? 5.0 : 2.5;
+      return ProgressiveOverloadSuggestion(
+        currentWeight: weight,
+        suggestedWeight: weight + increment,
+        unit: unit,
+        reason: '${workingSets.length} sets × ${workingSets.first.reps}+ reps achieved',
+      );
+    }
+    
+    return null;
+  }
+
+  /// Generate warm-up sets based on working weight.
+  List<ExerciseSet> generateWarmupSets(double workingWeight, String unit) {
+    if (workingWeight <= 0) return [];
+    return [
+      ExerciseSet(reps: 10, weight: (workingWeight * 0.5).roundToDouble(), unit: unit, rpe: null),
+      ExerciseSet(reps: 5, weight: (workingWeight * 0.7).roundToDouble(), unit: unit, rpe: null),
+      ExerciseSet(reps: 3, weight: (workingWeight * 0.85).roundToDouble(), unit: unit, rpe: null),
+    ];
+  }
+
+  /// Add warm-up sets to an exercise.
+  void addWarmupSetsToExercise(int exerciseIndex, double workingWeight, String unit) {
+    final draft = activeSession;
+    if (draft == null) return;
+    if (exerciseIndex < 0 || exerciseIndex >= draft.exercises.length) return;
+    
+    final warmups = generateWarmupSets(workingWeight, unit);
+    for (final set in warmups) {
+      draft.exercises[exerciseIndex].sets.add(set);
+    }
+    activeExerciseIndex = exerciseIndex;
     notifyListeners();
   }
 
@@ -414,6 +596,9 @@ class AppState extends ChangeNotifier {
     focusModeEnabled = true;
     tapAssistEnabled = true;
     experimentalMapEnabled = false;
+    supersetModeEnabled = false;
+    smartRestEnabled = true;
+    supersetPairedIndices = [];
     activeExerciseIndex = 0;
     defaultRestSeconds = 90;
     weeklyWorkoutGoal = 3;
@@ -729,6 +914,8 @@ class AppDb {
     required this.preferredWeekdays,
     required this.mapRoutes,
     required this.routeActivityLogs,
+    required this.supersetModeEnabled,
+    required this.smartRestEnabled,
   });
 
   final List<WorkoutSession> sessions;
@@ -742,6 +929,8 @@ class AppDb {
   final List<int> preferredWeekdays;
   final List<MapRoute> mapRoutes;
   final List<RouteActivityLog> routeActivityLogs;
+  final bool supersetModeEnabled;
+  final bool smartRestEnabled;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
@@ -776,6 +965,8 @@ class AppDb {
           rawRoutes.whereType<Map<String, Object?>>().map(MapRoute.fromJson).where((r) => r.points.length >= 2).toList(),
       routeActivityLogs:
           rawRouteLogs.whereType<Map<String, Object?>>().map(RouteActivityLog.fromJson).where((l) => l.routeId.isNotEmpty).toList(),
+      supersetModeEnabled: (json['supersetModeEnabled'] as bool?) ?? false,
+      smartRestEnabled: (json['smartRestEnabled'] as bool?) ?? true,
     );
   }
 
@@ -791,6 +982,8 @@ class AppDb {
         'preferredWeekdays': preferredWeekdays,
         'mapRoutes': mapRoutes.map((r) => r.toJson()).toList(),
         'routeActivityLogs': routeActivityLogs.map((l) => l.toJson()).toList(),
+        'supersetModeEnabled': supersetModeEnabled,
+        'smartRestEnabled': smartRestEnabled,
       };
 }
 
@@ -961,6 +1154,20 @@ class ScheduleSuggestion {
 
   final DateTime date;
   final String label;
+  final String reason;
+}
+
+class ProgressiveOverloadSuggestion {
+  const ProgressiveOverloadSuggestion({
+    required this.currentWeight,
+    required this.suggestedWeight,
+    required this.unit,
+    required this.reason,
+  });
+
+  final double currentWeight;
+  final double suggestedWeight;
+  final String unit;
   final String reason;
 }
 

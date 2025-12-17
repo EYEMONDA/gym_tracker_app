@@ -5,12 +5,23 @@ Gym Tracker is a web-based fitness tracker designed to be converted into a cross
 
 Core Features Implemented
 - Dynamic-Island-inspired top UI
-  - A centered “pill” overlay at the top of the screen.
+  - A centered "pill" overlay at the top of the screen.
   - Tap to expand into a smart search panel.
   - Shows an always-available rest timer in compact mode.
-  - Focus Mode: when a workout is active, the Island morphs into a quick logger (one-tap “Add set”).
+  - Focus Mode: when a workout is active, the Island morphs into a quick logger (one-tap "Add set").
   - Subtle state lighting: green glow for active workout logging, amber glow for rest timer.
   - Tap Assist option: increases touch targets without changing layout (helps reduce missed taps).
+
+  NEW — Dynamic Island Enhancements:
+  - Contextual states: Island shows different labels based on context (pre-workout, mid-workout, rest day).
+  - Gesture-based quick actions:
+    - Swipe down: start rest timer (smart duration based on exercise).
+    - Swipe up: open focus logger panel.
+    - Swipe left/right: cycle between exercises.
+  - Progressive Overload Nudge: when you've hit 3+ sets at the same weight with 8+ reps, the Island shows a gold "📈 Ready to progress" indicator suggesting you increase weight.
+  - Superset/Circuit Mode: auto-cycles to the next paired exercise after logging a set (cyan glow when active).
+  - Workout Streak Celebration: when you hit milestones (3+ day streak, weekly goal), the Island briefly celebrates with an orange glow and emoji.
+  - Morphing Save Button: grows more prominent (green glow, "💪") as you log more sets.
 
 - Workout tracker (live session)
   - Start a workout session.
@@ -18,6 +29,13 @@ Core Features Implemented
   - Add sets (reps + weight + unit + optional RPE).
   - Automatically starts a rest timer after logging/completing a set.
   - Save workout to local history.
+
+  NEW — Workout Flow Enhancements:
+  - Smart Rest Timer: auto-adjusts rest duration based on exercise type.
+    - Compound lifts (squat, bench, deadlift, etc.): 2:30 rest.
+    - Isolation exercises: 1:15 rest.
+  - One-Tap Warm-Up Sets: quickly add 3 warm-up sets (50%×10, 70%×5, 85%×3) based on your working weight.
+  - Superset Mode: pair exercises together; after logging a set, automatically switches to the next exercise in the pair.
 
 - Workout logger / history
   - List saved sessions.
@@ -30,12 +48,16 @@ Core Features Implemented
   - Tap a day to see:
     - Planned routines (multiple per day) with Start/Skip/Delete actions
     - Completed workouts for that day
-  - “Plan” button lets you schedule multiple routines on the same date (with optional time label like AM/PM/18:00).
+  - "Plan" button lets you schedule multiple routines on the same date (with optional time label like AM/PM/18:00).
 
 - Progress
   - Weekly workout goal tracking (simple progress bar).
   - Last-8-weeks consistency visualization (workouts/week bars).
   - Personal records (estimated 1RM) computed from logged weighted sets.
+
+  NEW — Progress Enhancements:
+  - Workout Streak tracking: see your current consecutive-day workout streak.
+  - Progressive overload detection: identifies when you're ready to increase weight on an exercise.
 
 - Smart schedule (lightweight)
   - Suggests the next workout day based on:
@@ -45,11 +67,11 @@ Core Features Implemented
 
 - Smart ID ("Smart encryption ID")
   - A local, privacy-preserving identifier generated randomly and stored locally.
-  - Used as an offline “identity anchor” without accounts.
+  - Used as an offline "identity anchor" without accounts.
   - Can be copied/regenerated in Settings.
 
 - Experimental features
-  - Settings includes an “Experimental” sub-tab with per-feature toggles.
+  - Settings includes an "Experimental" sub-tab with per-feature toggles.
   - Map + Routes (experimental):
     - Create routes by tapping points on a map (polyline).
     - Log route usage categorized as walk/jog/bike.
@@ -60,6 +82,8 @@ Design Goals
 - No account friction: immediate use, fully offline.
 - Dark/black theme: optimized for gym environments and OLED screens.
 - Fast interaction: Dynamic Island overlay keeps search + timers always reachable.
+- Morphing UI: buttons and states visually transform to guide user actions.
+- Progressive disclosure: advanced features (superset mode, smart rest) available but not overwhelming.
 
 What was used (and why)
 - Flutter (UI framework)
@@ -72,7 +96,7 @@ What was used (and why)
 
 - SharedPreferences (local persistence)
   - Why: Simple, reliable storage for an offline-first prototype.
-  - How: The app persists a small JSON “database” blob with sessions and preferences.
+  - How: The app persists a small JSON "database" blob with sessions and preferences.
 
 - A simple local data model (JSON)
   - Why: Enables richer data than a list of strings (sessions → exercises → sets).
@@ -90,28 +114,65 @@ What was used (and why)
   - Why: RPE captures difficulty, PRs show progress at a glance.
   - How: RPE is stored per set; PRs use a simple 1RM estimate from logged sets.
 
+- Gesture-based interactions
+  - Why: Reduces tap count; more intuitive for quick gym use.
+  - How: Swipe gestures on Dynamic Island for common actions.
+
+- Smart rest timer (exercise-type detection)
+  - Why: Different exercises need different rest times.
+  - How: Pattern-matches exercise names against compound lift keywords.
+
 Where things live in the code
 - App entry/theme: lib/main.dart
 - App state + persistence + Smart ID: lib/state/app_state.dart
+  - Progressive overload detection
+  - Streak calculation
+  - Smart rest logic
+  - Superset mode state
+  - Warm-up set generation
 - Tab shell + overlay: lib/ui/root_shell.dart
 - Dynamic Island: lib/ui/widgets/dynamic_island.dart
+  - Gesture detection
+  - Contextual states
+  - Progressive overload nudge UI
+  - Superset mode UI
+  - Streak celebration
+  - Morphing save button
+  - Warm-up dialog
 - Screens:
   - Workout: lib/ui/screens/workout_screen.dart
   - Log: lib/ui/screens/log_screen.dart
   - Calendar: lib/ui/screens/calendar_screen.dart
   - Schedule: lib/ui/screens/schedule_screen.dart
   - Settings: lib/ui/screens/settings_screen.dart
+    - Smart rest toggle
+    - Superset mode toggle
+  - Progress: lib/ui/screens/progress_screen.dart
 
 Current limitations (intentional for v1)
 - No cloud sync and no login.
 - No export/import yet (recommended next if you want device-to-device portability).
 - Encryption is not end-to-end yet; the Smart ID is an offline identifier, not encrypted storage.
+- Live Activities / Lock Screen widgets not yet implemented (iOS-specific).
 
 Recommended next upgrades
 - Export/import (encrypted) using the Smart ID as a key-derivation seed.
-- Templates (workout plans) + quick-add.
-- Better calendar markers (dots on days with workouts).
-- More advanced “smart schedule” (splits like PPL, Full Body, Upper/Lower).
+- iOS Live Activities integration for rest timer on lock screen.
+- Voice logging ("Add set, 10 reps, 80 kg").
+- Watch integration (Apple Watch / Wear OS).
+- Exercise library with muscle group tagging.
+- Volume tracking (sets × reps × weight per muscle group).
+- Rest timer sound/vibration alerts.
+
+New Feature Summary (This Update)
+1. Progressive Overload Nudge — Gold indicator when ready to increase weight.
+2. Superset/Circuit Mode — Auto-cycle exercises, cyan glow, long-press to pair.
+3. One-Tap Warm-Up Sets — Add 3 warm-up sets at 50/70/85% of working weight.
+4. Gesture-Based Quick Actions — Swipe down/up/left/right on Dynamic Island.
+5. Smart Rest Auto-Adjust — 2:30 for compounds, 1:15 for isolation.
+6. Contextual Island States — Different labels for rest day, pre-workout, etc.
+7. Morphing Save Button — Grows and glows green as you log more sets.
+8. Workout Streak Celebration — Orange glow and emoji when hitting milestones.
 
 Update policy
 - Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.
