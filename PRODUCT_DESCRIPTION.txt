@@ -168,6 +168,16 @@ Where things live in the code
   - Streak celebration
   - Morphing save button
   - Warm-up dialog
+  - Pulsing rest timer display
+- Animated Widgets: lib/ui/widgets/animated_widgets.dart
+  - AnimatedProgressBar (smooth transitions with glow)
+  - StaggeredListItem (fade/slide entrance)
+  - ConfettiCelebration (particle effects)
+  - PulsingGlow (attention-drawing pulse)
+  - ScaleTap (press feedback with haptic)
+  - BounceIn (elastic entrance)
+  - AnimatedNumber (counting animation)
+  - ShimmerLoading (loading placeholder)
 - Screens:
   - Workout: lib/ui/screens/workout_screen.dart
   - Log: lib/ui/screens/log_screen.dart
@@ -238,6 +248,16 @@ Latest Update — Muscle Heat Map & Goals:
 13. Rest Timer Alerts — Vibration feedback when timer completes.
     - Double haptic pulse for attention.
     - Configurable on/off in Settings.
+
+UI/UX Enhancements — Dynamic animations and micro-interactions:
+14. Animated Progress Bars — Smooth value transitions with glow effects.
+15. Staggered List Animations — Items fade and slide in sequentially.
+16. Confetti Celebration — Tap achievements summary to trigger confetti.
+17. Scale Tap Feedback — Cards and buttons scale on press with haptic.
+18. Pulsing Glow Effects — Active elements pulse to draw attention.
+19. Bounce-In Animations — Icons and cards bounce into view.
+20. Achievement Detail Dialog — Tap achievements to see full details + progress.
+21. Animated Numbers — Values count up smoothly when changing.
 
 Update policy
 - Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.

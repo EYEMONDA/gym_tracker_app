@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
+import '../widgets/animated_widgets.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -93,22 +94,37 @@ class _GoalsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.flag_outlined, size: 64, color: Colors.white.withOpacity(0.3)),
+              BounceIn(
+                child: Icon(Icons.flag_outlined, size: 64, color: Colors.white.withOpacity(0.3)),
+              ),
               const SizedBox(height: 16),
-              const Text(
-                'No goals yet',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              StaggeredListItem(
+                index: 0,
+                child: const Text(
+                  'No goals yet',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Set fitness goals with milestones to track your progress and stay motivated.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xAAFFFFFF)),
+              StaggeredListItem(
+                index: 1,
+                child: const Text(
+                  'Set fitness goals with milestones to track your progress and stay motivated.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xAAFFFFFF)),
+                ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Tap the + button to create your first goal',
-                style: TextStyle(color: Color(0x88FFFFFF), fontSize: 12),
+              StaggeredListItem(
+                index: 2,
+                child: PulsingGlow(
+                  glowColor: const Color(0xFF4CAF50),
+                  maxRadius: 6,
+                  child: const Text(
+                    'Tap the + button to create your first goal',
+                    style: TextStyle(color: Color(0x88FFFFFF), fontSize: 12),
+                  ),
+                ),
               ),
             ],
           ),
@@ -116,19 +132,32 @@ class _GoalsTab extends StatelessWidget {
       );
     }
 
+    int itemIndex = 0;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (activeGoals.isNotEmpty) ...[
-          const Text('Active Goals', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          StaggeredListItem(
+            index: itemIndex++,
+            child: const Text('Active Goals', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ),
           const SizedBox(height: 12),
-          ...activeGoals.map((goal) => _GoalCard(goal: goal, app: app)),
+          ...activeGoals.map((goal) => StaggeredListItem(
+            index: itemIndex++,
+            child: _GoalCard(goal: goal, app: app),
+          )),
         ],
         if (completedGoals.isNotEmpty) ...[
           const SizedBox(height: 24),
-          const Text('Completed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          StaggeredListItem(
+            index: itemIndex++,
+            child: const Text('Completed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ),
           const SizedBox(height: 12),
-          ...completedGoals.map((goal) => _GoalCard(goal: goal, app: app, isCompleted: true)),
+          ...completedGoals.map((goal) => StaggeredListItem(
+            index: itemIndex++,
+            child: _GoalCard(goal: goal, app: app, isCompleted: true),
+          )),
         ],
       ],
     );
@@ -195,14 +224,11 @@ class _GoalCard extends StatelessWidget {
               style: const TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
             ),
             const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                backgroundColor: const Color(0x22FFFFFF),
-                color: isCompleted ? const Color(0xFF4CAF50) : _getCategoryColor(goal.category),
-              ),
+            AnimatedProgressBar(
+              value: progress,
+              height: 6,
+              backgroundColor: const Color(0x22FFFFFF),
+              valueColor: isCompleted ? const Color(0xFF4CAF50) : _getCategoryColor(goal.category),
             ),
           ],
         ),
@@ -366,105 +392,150 @@ class _MilestoneTile extends StatelessWidget {
   }
 }
 
-class _AchievementsTab extends StatelessWidget {
+class _AchievementsTab extends StatefulWidget {
   const _AchievementsTab({required this.app});
 
   final AppState app;
 
   @override
+  State<_AchievementsTab> createState() => _AchievementsTabState();
+}
+
+class _AchievementsTabState extends State<_AchievementsTab> {
+  bool _showCelebration = false;
+
+  void _triggerCelebration() {
+    setState(() => _showCelebration = true);
+    HapticFeedback.heavyImpact();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final achievements = AppState.achievements;
-    final unlockedCount = app.unlockedAchievements.length;
+    final unlockedCount = widget.app.unlockedAchievements.length;
     final totalCount = achievements.length;
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
       children: [
-        // Progress summary
-        Container(
+        ListView(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF1A1A2E),
-                const Color(0xFF0A0A0A),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0x33FFD700)),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 32),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$unlockedCount / $totalCount Unlocked',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Text(
-                          unlockedCount == 0
-                              ? 'Start working out to unlock achievements!'
-                              : unlockedCount == totalCount
-                                  ? 'Congratulations! You unlocked all achievements!'
-                                  : 'Keep going! More achievements await.',
-                          style: const TextStyle(
-                            color: Color(0xAAFFFFFF),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+          children: [
+            // Progress summary with animations
+            StaggeredListItem(
+              index: 0,
+              child: ScaleTap(
+                onTap: unlockedCount > 0 ? _triggerCelebration : null,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF1A1A2E), Color(0xFF0A0A0A)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0x33FFD700)),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(
-                  value: totalCount > 0 ? unlockedCount / totalCount : 0,
-                  minHeight: 8,
-                  backgroundColor: const Color(0x33FFFFFF),
-                  valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFD700)),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          BounceIn(
+                            delay: const Duration(milliseconds: 200),
+                            child: PulsingGlow(
+                              glowColor: const Color(0xFFFFD700),
+                              enabled: unlockedCount > 0,
+                              maxRadius: 8,
+                              child: const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 32),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    AnimatedNumber(
+                                      value: unlockedCount.toDouble(),
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                                    ),
+                                    Text(
+                                      ' / $totalCount Unlocked',
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  unlockedCount == 0
+                                      ? 'Start working out to unlock achievements!'
+                                      : unlockedCount == totalCount
+                                          ? '🎉 Congratulations! All unlocked!'
+                                          : 'Tap to celebrate! Keep going!',
+                                  style: const TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      AnimatedProgressBar(
+                        value: totalCount > 0 ? unlockedCount / totalCount : 0,
+                        height: 10,
+                        valueColor: const Color(0xFFFFD700),
+                        backgroundColor: const Color(0x33FFFFFF),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            StaggeredListItem(
+              index: 1,
+              child: const Text('Achievements', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            ),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.95,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: achievements.length,
+              itemBuilder: (context, index) {
+                final achievement = achievements[index];
+                final isUnlocked = widget.app.isAchievementUnlocked(achievement.id);
+                final progress = widget.app.getAchievementProgress(achievement.id);
+                return StaggeredListItem(
+                  index: index + 2,
+                  child: _AchievementCard(
+                    achievement: achievement,
+                    isUnlocked: isUnlocked,
+                    progress: progress,
+                  ),
+                );
+              },
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        const Text('Achievements', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-        const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 0.95,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+        // Celebration overlay
+        if (_showCelebration)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ConfettiCelebration(
+                particleCount: 80,
+                duration: const Duration(seconds: 3),
+                onComplete: () {
+                  if (mounted) setState(() => _showCelebration = false);
+                },
+              ),
+            ),
           ),
-          itemCount: achievements.length,
-          itemBuilder: (context, index) {
-            final achievement = achievements[index];
-            final isUnlocked = app.isAchievementUnlocked(achievement.id);
-            final progress = app.getAchievementProgress(achievement.id);
-            return _AchievementCard(
-              achievement: achievement,
-              isUnlocked: isUnlocked,
-              progress: progress,
-            );
-          },
-        ),
       ],
     );
   }
@@ -484,6 +555,24 @@ class _AchievementCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = IconData(achievement.iconCodePoint, fontFamily: 'MaterialIcons');
+    
+    return ScaleTap(
+      onTap: () {
+        // Show achievement details
+        showDialog(
+          context: context,
+          builder: (_) => _AchievementDetailDialog(
+            achievement: achievement,
+            isUnlocked: isUnlocked,
+            progress: progress,
+          ),
+        );
+      },
+      child: _buildCard(icon),
+    );
+  }
+
+  Widget _buildCard(IconData icon) {
     
     return Container(
       padding: const EdgeInsets.all(12),
@@ -582,6 +671,147 @@ class _AchievementCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _AchievementDetailDialog extends StatelessWidget {
+  const _AchievementDetailDialog({
+    required this.achievement,
+    required this.isUnlocked,
+    required this.progress,
+  });
+
+  final Achievement achievement;
+  final bool isUnlocked;
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = IconData(achievement.iconCodePoint, fontFamily: 'MaterialIcons');
+    
+    return Dialog(
+      backgroundColor: const Color(0xFF0A0A0A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon with animation
+            BounceIn(
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: isUnlocked
+                      ? const Color(0xFFFFD700).withOpacity(0.2)
+                      : const Color(0x22FFFFFF),
+                  shape: BoxShape.circle,
+                  boxShadow: isUnlocked
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFFFFD700).withOpacity(0.3),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Icon(
+                  isUnlocked ? icon : Icons.lock,
+                  color: isUnlocked ? const Color(0xFFFFD700) : const Color(0x66FFFFFF),
+                  size: 40,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Title
+            Text(
+              achievement.title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            // Description
+            Text(
+              achievement.description,
+              style: const TextStyle(
+                color: Color(0xAAFFFFFF),
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // Progress or unlocked status
+            if (isUnlocked) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4CAF50).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.5)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Unlocked!',
+                      style: TextStyle(
+                        color: Color(0xFF4CAF50),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Progress: ',
+                        style: TextStyle(color: Color(0xAAFFFFFF)),
+                      ),
+                      AnimatedNumber(
+                        value: progress * 100,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF4CAF50),
+                        ),
+                        suffix: '%',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: 200,
+                    child: AnimatedProgressBar(
+                      value: progress,
+                      height: 8,
+                      valueColor: const Color(0xFF4CAF50),
+                      backgroundColor: const Color(0x33FFFFFF),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 20),
+            // Close button
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
       ),
     );
   }

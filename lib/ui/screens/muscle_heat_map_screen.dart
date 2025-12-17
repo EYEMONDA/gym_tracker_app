@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
+import '../widgets/animated_widgets.dart';
 
 class MuscleHeatMapScreen extends StatefulWidget {
   const MuscleHeatMapScreen({super.key});
