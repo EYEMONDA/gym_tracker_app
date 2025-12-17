@@ -47,6 +47,16 @@ class AppState extends ChangeNotifier {
 
   Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
+
+    // Clean up legacy keys from the original prototype (single-screen logger).
+    // This keeps storage tidy for users who ran older versions of the app.
+    await _prefs!.remove('workouts');
+    await _prefs!.remove('sessions');
+    await _prefs!.remove('isWorkoutActive');
+    await _prefs!.remove('startTime');
+    await _prefs!.remove('endTime');
+    await _prefs!.remove('breakStartTime');
+
     smartId = _prefs!.getString(_prefsKeySmartId);
     smartId ??= _generateSmartId();
     await _prefs!.setString(_prefsKeySmartId, smartId!);
