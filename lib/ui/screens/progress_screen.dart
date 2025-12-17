@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
+import '../theme/app_theme.dart';
 import '../widgets/animated_widgets.dart';
+import '../widgets/app_card.dart';
 import 'goals_screen.dart';
 
 class ProgressScreen extends StatefulWidget {
@@ -102,7 +104,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           const SizedBox(height: 18),
           StaggeredListItem(
             index: 0,
-            child: _Card(
+            child: AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -196,7 +198,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           const SizedBox(height: 14),
           StaggeredListItem(
             index: 2,
-            child: _Card(
+            child: AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -215,7 +217,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           const SizedBox(height: 14),
           StaggeredListItem(
             index: 3,
-            child: _Card(
+            child: AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -350,23 +352,7 @@ class _PrRow {
   final String unit;
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070707),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x22FFFFFF)),
-      ),
-      child: child,
-    );
-  }
-}
+// Using shared AppCard widget from app_card.dart
 
 class _GoalsCard extends StatelessWidget {
   const _GoalsCard({required this.app});

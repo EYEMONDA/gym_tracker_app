@@ -159,25 +159,33 @@ Where things live in the code
   - User profile for comparisons
   - Achievement definitions and unlock logic
   - Rest timer vibration alerts
+  - Data models (WorkoutSession, ExerciseSet, FitnessGoal, etc.)
 - Tab shell + overlay: lib/ui/root_shell.dart
-- Dynamic Island: lib/ui/widgets/dynamic_island.dart
-  - Gesture detection
-  - Contextual states
-  - Progressive overload nudge UI
-  - Superset mode UI
-  - Streak celebration
-  - Morphing save button
-  - Warm-up dialog
-  - Pulsing rest timer display
-- Animated Widgets: lib/ui/widgets/animated_widgets.dart
-  - AnimatedProgressBar (smooth transitions with glow)
-  - StaggeredListItem (fade/slide entrance)
-  - ConfettiCelebration (particle effects)
-  - PulsingGlow (attention-drawing pulse)
-  - ScaleTap (press feedback with haptic)
-  - BounceIn (elastic entrance)
-  - AnimatedNumber (counting animation)
-  - ShimmerLoading (loading placeholder)
+- Theme constants: lib/ui/theme/app_theme.dart
+  - AppColors (centralized color palette)
+  - AppSizes (border radius, padding, spacing)
+  - AppDurations (animation timing)
+- Shared widgets: lib/ui/widgets/
+  - app_card.dart — AppCard, AppCardSpaced (DRY card containers)
+  - animated_widgets.dart — Animation utilities
+    - AnimatedProgressBar (smooth transitions with glow)
+    - StaggeredListItem (fade/slide entrance)
+    - ConfettiCelebration (particle effects)
+    - PulsingGlow (attention-drawing pulse)
+    - ScaleTap (press feedback with haptic)
+    - BounceIn (elastic entrance)
+    - AnimatedNumber (counting animation)
+    - ShimmerLoading (loading placeholder)
+  - dynamic_island.dart — Dynamic Island UI
+    - Gesture detection
+    - Contextual states
+    - Progressive overload nudge UI
+    - Superset mode UI
+    - Streak celebration
+    - Morphing save button
+    - Warm-up dialog
+    - Pulsing rest timer display
+  - month_calendar.dart — Calendar widget
 - Screens:
   - Workout: lib/ui/screens/workout_screen.dart
   - Log: lib/ui/screens/log_screen.dart
@@ -258,6 +266,14 @@ UI/UX Enhancements — Dynamic animations and micro-interactions:
 19. Bounce-In Animations — Icons and cards bounce into view.
 20. Achievement Detail Dialog — Tap achievements to see full details + progress.
 21. Animated Numbers — Values count up smoothly when changing.
+
+Code Quality (Refactoring Done)
+- Extracted duplicate _Card widgets into shared AppCard/AppCardSpaced.
+- Created centralized AppColors, AppSizes, AppDurations constants.
+- Removed ~100 lines of duplicate code across 5 files.
+- All UI screens now import shared theme constants.
+- Animation utilities extracted to reusable widgets.
+- No linter errors or warnings.
 
 Update policy
 - Keep this file updated as features are added/changed so it always reflects what the app does and why the architecture choices were made.
