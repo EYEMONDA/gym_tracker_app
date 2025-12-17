@@ -409,6 +409,11 @@ class AppState extends ChangeNotifier {
       }
     }
 
+    // Auto-start smart rest timer if requested
+    if (startSmartRest && smartRestEnabled) {
+      startRestTimer(seconds: getSmartRestSeconds(ex.name));
+    }
+
     notifyListeners();
     return added;
   }
