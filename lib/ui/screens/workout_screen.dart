@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 
@@ -410,11 +411,18 @@ class _AddSetDialogState extends State<_AddSetDialog> {
   final TextEditingController _rpe = TextEditingController();
   String _unit = 'kg';
 
+  final FocusNode _repsFocus = FocusNode();
+  final FocusNode _weightFocus = FocusNode();
+  final FocusNode _rpeFocus = FocusNode();
+
   @override
   void dispose() {
     _reps.dispose();
     _weight.dispose();
     _rpe.dispose();
+    _repsFocus.dispose();
+    _weightFocus.dispose();
+    _rpeFocus.dispose();
     super.dispose();
   }
 
@@ -427,17 +435,39 @@ class _AddSetDialogState extends State<_AddSetDialog> {
         children: [
           TextField(
             controller: _reps,
+            focusNode: _repsFocus,
             keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
             decoration: const InputDecoration(labelText: 'Reps'),
+            onSubmitted: (_) => _weightFocus.requestFocus(),
           ),
           TextField(
             controller: _weight,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            focusNode: _weightFocus,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
+            textInputAction: TextInputAction.next,
+            // Prevent symbols like "#" from being entered at all.
+            // Allow digits plus one decimal separator (dot or comma).
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^[0-9]*[.,]?[0-9]{0,2}$')),
+              LengthLimitingTextInputFormatter(7),
+            ],
             decoration: const InputDecoration(labelText: 'Weight'),
+            onSubmitted: (_) => _rpeFocus.requestFocus(),
           ),
           TextField(
             controller: _rpe,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            focusNode: _rpeFocus,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: false),
+            textInputAction: TextInputAction.done,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^[0-9]*[.,]?[0-9]{0,1}$')),
+              LengthLimitingTextInputFormatter(4),
+            ],
             decoration: const InputDecoration(labelText: 'RPE (optional, 1–10)'),
           ),
           const SizedBox(height: 10),
@@ -458,9 +488,9 @@ class _AddSetDialogState extends State<_AddSetDialog> {
         FilledButton(
           onPressed: () {
             final reps = int.tryParse(_reps.text.trim()) ?? 10;
-            final w = double.tryParse(_weight.text.trim()) ?? 0;
+            final w = double.tryParse(_weight.text.trim().replaceAll(',', '.')) ?? 0;
             final rpeRaw = _rpe.text.trim();
-            final rpe = rpeRaw.isEmpty ? null : double.tryParse(rpeRaw);
+            final rpe = rpeRaw.isEmpty ? null : double.tryParse(rpeRaw.replaceAll(',', '.'));
             Navigator.pop(
               context,
               _SetDraft(
