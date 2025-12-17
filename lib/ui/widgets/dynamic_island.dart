@@ -476,18 +476,15 @@ class _TopRow extends StatelessWidget {
               color: accent.withOpacity(0.95),
             ),
             onPressed: () {
-              final added = app.addQuickSetToActive();
+              final added = app.addQuickSetToActive(startSmartRest: true);
               if (added == null) return;
-              // Use smart rest based on exercise type
-              final smartSeconds = app.getSmartRestSeconds(ex!.name);
-              app.startRestTimer(seconds: smartSeconds);
               
               final supersetInfo = supersetMode && app.supersetPairedIndices.length >= 2 
                   ? ' → Next exercise' 
                   : '';
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Added set $nextSetNumber • ${ex.name}$supersetInfo'),
+                  content: Text('Added set $nextSetNumber • ${ex!.name}$supersetInfo'),
                   duration: const Duration(seconds: 2),
                   action: SnackBarAction(
                     label: 'Undo',
@@ -608,9 +605,8 @@ class _FocusLoggerPanel extends StatelessWidget {
             Expanded(
               child: FilledButton.icon(
                 onPressed: () {
-                  final added = app.addQuickSetToActive();
+                  final added = app.addQuickSetToActive(startSmartRest: true);
                   if (added == null) return;
-                  app.startRestTimer(seconds: smartRestSeconds);
                   final supersetInfo = supersetMode && app.supersetPairedIndices.length >= 2 
                       ? ' → Next' 
                       : '';

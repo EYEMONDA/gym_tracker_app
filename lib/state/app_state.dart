@@ -377,10 +377,8 @@ class AppState extends ChangeNotifier {
   /// One-tap logging: adds a set to the active exercise using last-set defaults.
   ///
   /// Returns info to support an "Undo" action.
-  /// One-tap logging: adds a set to the active exercise using last-set defaults.
-  ///
-  /// Returns info to support an "Undo" action.
   /// If superset mode is enabled, auto-cycles to next paired exercise.
+  /// If [startSmartRest] is true and smart rest is enabled, auto-starts the rest timer.
   QuickSetAdded? addQuickSetToActive({bool startSmartRest = false}) {
     final draft = activeSession;
     if (draft == null) return null;
