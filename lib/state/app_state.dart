@@ -94,6 +94,42 @@ class AppState extends ChangeNotifier {
   /// Smart rest: auto-adjust rest time based on exercise type.
   bool smartRestEnabled = true;
 
+  /// Favorite exercises for quick access.
+  final Set<String> favoriteExercises = {};
+
+  /// Toggle favorite status of an exercise.
+  Future<void> toggleFavoriteExercise(String exerciseName) async {
+    final name = exerciseName.trim();
+    if (name.isEmpty) return;
+    if (favoriteExercises.contains(name)) {
+      favoriteExercises.remove(name);
+    } else {
+      favoriteExercises.add(name);
+    }
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Check if an exercise is favorited.
+  bool isFavoriteExercise(String exerciseName) {
+    return favoriteExercises.contains(exerciseName.trim());
+  }
+
+  /// Add multiple exercises to active workout at once.
+  void addMultipleExercisesToActive(List<String> exerciseNames) {
+    final draft = activeSession;
+    if (draft == null) return;
+    for (final name in exerciseNames) {
+      final trimmed = name.trim();
+      if (trimmed.isEmpty) continue;
+      draft.exercises.add(ExerciseDraft(name: trimmed));
+    }
+    if (draft.exercises.isNotEmpty) {
+      activeExerciseIndex = draft.exercises.length - 1;
+    }
+    notifyListeners();
+  }
+
   /// Compound exercises that warrant longer rest times.
   static const compoundExercises = {
     'squat', 'deadlift', 'bench press', 'bench', 'overhead press', 'ohp',
@@ -282,6 +318,9 @@ class AppState extends ChangeNotifier {
         fitnessGoals
           ..clear()
           ..addAll(db.fitnessGoals);
+        favoriteExercises
+          ..clear()
+          ..addAll(db.favoriteExercises);
       } catch (_) {
         // If the DB is corrupt, keep the app usable.
       }
@@ -316,6 +355,7 @@ class AppState extends ChangeNotifier {
       experimentalHeatMapEnabled: experimentalHeatMapEnabled,
       userProfile: userProfile,
       fitnessGoals: fitnessGoals,
+      favoriteExercises: favoriteExercises.toList(),
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
   }
@@ -1309,7 +1349,7 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    return hits.take(8).toList();
+    return hits.take(15).toList();
   }
 
   String _newId() {
@@ -1351,6 +1391,7 @@ class AppDb {
     required this.experimentalHeatMapEnabled,
     required this.userProfile,
     required this.fitnessGoals,
+    required this.favoriteExercises,
   });
 
   final List<WorkoutSession> sessions;
@@ -1369,6 +1410,7 @@ class AppDb {
   final bool experimentalHeatMapEnabled;
   final UserProfile? userProfile;
   final List<FitnessGoal> fitnessGoals;
+  final List<String> favoriteExercises;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
@@ -1410,6 +1452,9 @@ class AppDb {
       experimentalHeatMapEnabled: (json['experimentalHeatMapEnabled'] as bool?) ?? false,
       userProfile: rawProfile != null ? UserProfile.fromJson(rawProfile) : null,
       fitnessGoals: rawGoals.whereType<Map<String, Object?>>().map(FitnessGoal.fromJson).toList(),
+      favoriteExercises: (json['favoriteExercises'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(),
     );
   }
 
@@ -1430,6 +1475,7 @@ class AppDb {
         'experimentalHeatMapEnabled': experimentalHeatMapEnabled,
         'userProfile': userProfile?.toJson(),
         'fitnessGoals': fitnessGoals.map((g) => g.toJson()).toList(),
+        'favoriteExercises': favoriteExercises,
       };
 }
 

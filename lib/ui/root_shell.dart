@@ -7,7 +7,7 @@ import 'screens/progress_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/workout_screen.dart';
-import 'widgets/dynamic_island.dart';
+import 'widgets/morphing_island.dart';
 
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
@@ -52,7 +52,7 @@ class _RootShellState extends State<RootShell> {
               bottom: false,
               child: Padding(
                 padding: EdgeInsets.only(top: 8),
-                child: Center(child: DynamicIsland()),
+                child: Center(child: MorphingIsland()),
               ),
             ),
           ),
