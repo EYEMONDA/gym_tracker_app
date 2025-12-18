@@ -256,11 +256,13 @@ class _DynamicIslandState extends State<DynamicIsland> with SingleTickerProvider
                     _focusNode.requestFocus();
                   }
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                child: ClipRect(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: expanded ? 10 : 6),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                       _TopRow(
                         app: app,
                         expanded: expanded,
@@ -320,6 +322,7 @@ class _DynamicIslandState extends State<DynamicIsland> with SingleTickerProvider
                     ],
                   ),
                 ),
+              ),
               ),
             ),
           ),
