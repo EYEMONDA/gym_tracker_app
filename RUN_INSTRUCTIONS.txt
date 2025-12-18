@@ -2,46 +2,93 @@ Gym Tracker App — Run Instructions
 
 This project is a Flutter app (web-first) that also runs on iOS/Android later.
 
-1) Prerequisites
+Prerequisites
 - Install Flutter SDK (includes Dart): https://flutter.dev/docs/get-started/install
 - Verify your setup:
   flutter doctor
 
-2) Get dependencies (from the repo root)
+Quick Start (Web)
+  cd /workspace
   flutter pub get
-
-3) Run as a web app (recommended for now)
-- Enable web support (one-time per machine):
   flutter config --enable-web
-- Run in Chrome:
   flutter run -d chrome
 
-4) Run on Android (optional)
-- Install Android Studio + Android SDK, then:
-  flutter doctor
-- Start an emulator or plug in a device with USB debugging, then:
-  flutter run -d android
+Run on Mobile
+- Android: flutter run -d android (requires Android Studio + SDK)
+- iOS: flutter run -d ios (requires macOS + Xcode)
 
-5) Run on iOS (optional; requires macOS)
-- Install Xcode + iOS tooling, then:
-  flutter doctor
-- Then:
-  flutter run -d ios
+Build for Production
+  flutter build web --release      # Web bundle in build/web/
+  flutter build apk --release      # Android APK
+  flutter build ios --release      # iOS (requires macOS)
 
-6) Build a release web bundle
-  flutter build web --release
+Project Structure
+  lib/
+  ├── main.dart                      # App entry point
+  ├── state/
+  │   ├── app_state.dart             # All state + data models (~2500 lines)
+  │   ├── storage_optimization.dart  # Compact keys + compression utils
+  │   ├── compression_io.dart        # Gzip for mobile/desktop
+  │   └── compression_stub.dart      # No-op stub for web
+  └── ui/
+      ├── root_shell.dart            # Tab navigation + Dynamic Island overlay
+      ├── theme/
+      │   └── app_theme.dart         # Centralized colors, sizes, durations
+      ├── widgets/
+      │   ├── app_card.dart          # Shared card containers
+      │   ├── animated_widgets.dart  # Animation utilities
+      │   ├── dynamic_island.dart    # Dynamic Island UI
+      │   └── month_calendar.dart    # Calendar widget
+      └── screens/
+          ├── workout_screen.dart    # Active workout logging
+          ├── log_screen.dart        # Workout history
+          ├── calendar_screen.dart   # Calendar view
+          ├── schedule_screen.dart   # Routine scheduling
+          ├── progress_screen.dart   # PRs and weekly stats
+          ├── goals_screen.dart      # Goals & achievements
+          ├── settings_screen.dart   # App settings
+          ├── muscle_heat_map_screen.dart  # Experimental heat map
+          └── map_routes_screen.dart       # Experimental map routes
 
-Where is data stored?
-- There is NO login.
-- Data is stored locally using SharedPreferences.
-  - On mobile: platform key/value storage.
-  - On web: browser local storage backing (implementation detail of the plugin).
+Data Storage
+- NO login required.
+- Data stored locally via SharedPreferences.
+  - Mobile: platform key/value storage
+  - Web: browser localStorage
+- Data persisted as JSON in 'gym_tracker_db_v1' key.
+
+Storage Optimization (Prepared)
+- Compact JSON keys ready (K.sessions instead of 'sessions')
+- Gzip compression available on mobile (~75% reduction)
+- Backward-compatible reading (supports old + new formats)
+- Estimated savings for 1-year user (150 sessions):
+  - Current JSON:     ~180 KB
+  - Compact JSON:     ~100 KB
+  - Compact + Gzip:   ~25 KB (86% smaller)
+
+Key Features
+- Dynamic Island UI with gesture controls
+- Workout tracking with smart rest timers
+- Progressive overload detection
+- Achievement system with 12 unlockable badges
+- Fitness goals with milestones
+- Muscle heat map (experimental)
+- Animated UI with confetti, pulsing glows, staggered lists
+- Rest timer vibration alerts
+
+Development Tips
+- Run lints: flutter analyze
+- Run tests: flutter test
+- Hot reload: Press 'r' in terminal or save files in IDE
+- Check storage size: See storage_optimization.dart for estimateStorageSize()
 
 Troubleshooting
-- If flutter isn’t found: add the Flutter SDK bin/ to your PATH.
-- If web device not found:
-  flutter config --enable-web
-  flutter devices
+- "flutter not found": Add Flutter SDK bin/ to your PATH
+- "No devices found": flutter config --enable-web && flutter devices
+- "Pub get failed": Delete pubspec.lock and re-run flutter pub get
+- "Compression not working": Only available on mobile, not web
 
-Notes for this workspace environment
-- If you’re running in a remote/container environment that doesn’t have Flutter installed, install Flutter on your local machine to run the app.
+Notes for Remote Environments
+- This workspace may not have Flutter installed.
+- Clone the repo locally and run with Flutter on your machine.
+- All code is pure Dart/Flutter with minimal native dependencies.

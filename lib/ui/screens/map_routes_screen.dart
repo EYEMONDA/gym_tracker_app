@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../state/app_state.dart';
+import '../widgets/app_card.dart';
 
 class MapRoutesScreen extends StatelessWidget {
   const MapRoutesScreen({super.key});
@@ -52,7 +53,7 @@ class MapRoutesScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _Card(
+          AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
@@ -69,7 +70,7 @@ class MapRoutesScreen extends StatelessWidget {
           Text('Routes', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           if (routes.isEmpty)
-            const _Card(
+            const AppCard(
               child: Text('No routes yet. Tap + to create one.', style: TextStyle(color: Color(0xAAFFFFFF))),
             )
           else
@@ -131,7 +132,7 @@ class MapRoutesScreen extends StatelessWidget {
           Text('Recent route activity', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           if (logs.isEmpty)
-            const _Card(
+            const AppCard(
               child: Text('No route activity yet.', style: TextStyle(color: Color(0xAAFFFFFF))),
             )
           else
@@ -378,23 +379,7 @@ class _RouteDraft {
   final List<MapPoint> points;
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070707),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x22FFFFFF)),
-      ),
-      child: child,
-    );
-  }
-}
+// Using shared AppCard widget from app_card.dart
 
 extension<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;

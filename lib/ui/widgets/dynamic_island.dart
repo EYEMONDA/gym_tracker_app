@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import '../screens/log_screen.dart';
+import 'animated_widgets.dart';
 
 class DynamicIsland extends StatefulWidget {
   const DynamicIsland({super.key});
@@ -433,9 +434,20 @@ class _TopRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         if (rest.isRunning && expanded)
-          Text(
-            restText,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+          PulsingGlow(
+            glowColor: const Color(0xFFFFB020),
+            maxRadius: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFB020).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                restText,
+                style: const TextStyle(color: Color(0xFFFFB020), fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
           ),
         if (expanded) ...[
           if (focusMode && workoutActive) ...[

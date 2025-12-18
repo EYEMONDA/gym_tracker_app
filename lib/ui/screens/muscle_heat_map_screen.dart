@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
+import '../widgets/animated_widgets.dart';
+import '../widgets/app_card.dart';
 
 class MuscleHeatMapScreen extends StatefulWidget {
   const MuscleHeatMapScreen({super.key});
@@ -151,7 +153,7 @@ class _FatigueView extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         // Suggestions card
-        _Card(
+        AppCardSpaced(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -262,7 +264,7 @@ class _CategorySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
+    return AppCardSpaced(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -320,7 +322,7 @@ class _ComparisonView extends StatelessWidget {
   Widget build(BuildContext context) {
     if (profile == null) {
       return Center(
-        child: _Card(
+        child: AppCardSpaced(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -347,7 +349,7 @@ class _ComparisonView extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         // Profile summary
-        _Card(
+        AppCardSpaced(
           child: Row(
             children: [
               const CircleAvatar(
@@ -392,7 +394,7 @@ class _ComparisonView extends StatelessWidget {
         ...MuscleGroup.values.map((muscle) {
           final ratio = comparison[muscle] ?? 0;
           final percentage = (ratio * 100).round();
-          return _Card(
+          return AppCardSpaced(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -841,21 +843,4 @@ class _ProfileDialogState extends State<_ProfileDialog> {
   }
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070707),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x22FFFFFF)),
-      ),
-      child: child,
-    );
-  }
-}
+// Using shared AppCardSpaced widget from app_card.dart

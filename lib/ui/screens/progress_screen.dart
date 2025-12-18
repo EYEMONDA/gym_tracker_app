@@ -1,8 +1,12 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
+import '../theme/app_theme.dart';
+import '../widgets/animated_widgets.dart';
+import '../widgets/app_card.dart';
 import 'goals_screen.dart';
 
 class ProgressScreen extends StatefulWidget {
@@ -98,94 +102,193 @@ class _ProgressScreenState extends State<ProgressScreen> {
             style: TextStyle(color: Color(0xAAFFFFFF)),
           ),
           const SizedBox(height: 18),
-          _Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Weekly goal', style: TextStyle(fontWeight: FontWeight.w900)),
-                const SizedBox(height: 6),
-                Text(
-                  '$thisWeekCount / $goal workouts this week',
-                  style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                LinearProgressIndicator(
-                  value: pct,
-                  minHeight: 10,
-                  backgroundColor: const Color(0x22000000),
-                  color: const Color(0xFF00D17A),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => app.setWeeklyWorkoutGoal(goal - 1),
-                      icon: const Icon(Icons.remove),
-                      label: const Text('Less'),
-                    ),
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      onPressed: () => app.setWeeklyWorkoutGoal(goal + 1),
-                      icon: const Icon(Icons.add),
-                      label: const Text('More'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _GoalsCard(app: app),
-          const SizedBox(height: 14),
-          _Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Last 8 weeks', style: TextStyle(fontWeight: FontWeight.w900)),
-                const SizedBox(height: 10),
-                _WeekBars(weeks: weeks, goal: goal),
-                const SizedBox(height: 6),
-                const Text(
-                  'Bars show workouts/week. Aim to keep it steady.',
-                  style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _Card(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Personal records (estimated 1RM)', style: TextStyle(fontWeight: FontWeight.w900)),
-                const SizedBox(height: 10),
-                TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Filter exercises (e.g., bench, squat)…',
-                    isDense: true,
+          StaggeredListItem(
+            index: 0,
+            child: AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('Weekly goal', style: TextStyle(fontWeight: FontWeight.w900)),
+                      const Spacer(),
+                      if (pct >= 1.0)
+                        PulsingGlow(
+                          glowColor: const Color(0xFF00D17A),
+                          maxRadius: 6,
+                          child: const Icon(Icons.check_circle, color: Color(0xFF00D17A), size: 20),
+                        ),
+                    ],
                   ),
-                  onChanged: (v) => setState(() => _prQuery = v),
-                ),
-                const SizedBox(height: 10),
-                if (prsAll.isEmpty)
-                  const Text(
-                    'No PRs yet. Log weighted sets (weight > 0) to build records.',
-                    style: TextStyle(color: Color(0xAAFFFFFF)),
-                  )
-                else
-                  ...prs.map((p) {
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(p.exercise, style: const TextStyle(fontWeight: FontWeight.w800)),
-                      subtitle: Text(
-                        'Best set: ${_fmtWeight(p.bestWeight)} ${p.unit} × ${p.bestReps}  •  Est 1RM: ${_fmtWeight(p.est1rm)}',
-                        style: const TextStyle(color: Color(0xAAFFFFFF)),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      AnimatedNumber(
+                        value: thisWeekCount.toDouble(),
+                        style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700),
                       ),
-                    );
-                  }),
-              ],
+                      Text(
+                        ' / $goal workouts this week',
+                        style: const TextStyle(color: Color(0xDDFFFFFF), fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  AnimatedProgressBar(
+                    value: pct,
+                    height: 10,
+                    backgroundColor: const Color(0x22000000),
+                    valueColor: const Color(0xFF00D17A),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ScaleTap(
+                        onTap: () {
+                          app.setWeeklyWorkoutGoal(goal - 1);
+                          HapticFeedback.lightImpact();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0x44FFFFFF)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.remove, size: 18),
+                              SizedBox(width: 4),
+                              Text('Less'),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      ScaleTap(
+                        onTap: () {
+                          app.setWeeklyWorkoutGoal(goal + 1);
+                          HapticFeedback.lightImpact();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0x44FFFFFF)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.add, size: 18),
+                              SizedBox(width: 4),
+                              Text('More'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          StaggeredListItem(
+            index: 1,
+            child: _GoalsCard(app: app),
+          ),
+          const SizedBox(height: 14),
+          StaggeredListItem(
+            index: 2,
+            child: AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Last 8 weeks', style: TextStyle(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 10),
+                  _WeekBars(weeks: weeks, goal: goal),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Bars show workouts/week. Aim to keep it steady.',
+                    style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          StaggeredListItem(
+            index: 3,
+            child: AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text('Personal records', style: TextStyle(fontWeight: FontWeight.w900)),
+                      const Spacer(),
+                      if (prsAll.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD700).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${prsAll.length} PRs',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD700),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Estimated 1RM',
+                    style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Filter exercises (e.g., bench, squat)…',
+                      isDense: true,
+                    ),
+                    onChanged: (v) => setState(() => _prQuery = v),
+                  ),
+                  const SizedBox(height: 10),
+                  if (prsAll.isEmpty)
+                    const Text(
+                      'No PRs yet. Log weighted sets (weight > 0) to build records.',
+                      style: TextStyle(color: Color(0xAAFFFFFF)),
+                    )
+                  else
+                    ...prs.asMap().entries.map((entry) {
+                      final p = entry.value;
+                      return ScaleTap(
+                        onTap: () => HapticFeedback.selectionClick(),
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFD700).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 18),
+                          ),
+                          title: Text(p.exercise, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          subtitle: Text(
+                            'Best set: ${_fmtWeight(p.bestWeight)} ${p.unit} × ${p.bestReps}  •  Est 1RM: ${_fmtWeight(p.est1rm)}',
+                            style: const TextStyle(color: Color(0xAAFFFFFF)),
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
             ),
           ),
         ],
@@ -249,23 +352,7 @@ class _PrRow {
   final String unit;
 }
 
-class _Card extends StatelessWidget {
-  const _Card({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF070707),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x22FFFFFF)),
-      ),
-      child: child,
-    );
-  }
-}
+// Using shared AppCard widget from app_card.dart
 
 class _GoalsCard extends StatelessWidget {
   const _GoalsCard({required this.app});
