@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
 import '../screens/log_screen.dart';
-import 'animated_widgets.dart';
 
 class DynamicIsland extends StatefulWidget {
   const DynamicIsland({super.key});
@@ -151,14 +150,14 @@ class _DynamicIslandState extends State<DynamicIsland> with SingleTickerProvider
     }
 
     final size = MediaQuery.sizeOf(context);
-    final double maxWidth = min(560.0, size.width - 24).toDouble();
-    final double collapsedWidth = min(workoutActive && focusMode ? 360.0 : 220.0, size.width - 24).toDouble();
+    final maxWidth = min(560, size.width - 24);
+    final collapsedWidth = min(workoutActive && focusMode ? 360 : 220, size.width - 24);
     final expanded = app.isSearchExpanded;
 
-    final double baseHeight = 42.0;
-    final double expandedHeight = min(320.0, size.height * 0.42).toDouble();
-    final double height = expanded ? expandedHeight : baseHeight;
-    final double width = expanded ? maxWidth : collapsedWidth;
+    final baseHeight = 42.0;
+    final expandedHeight = min(320.0, size.height * 0.42);
+    final height = expanded ? expandedHeight : baseHeight;
+    final width = expanded ? maxWidth : collapsedWidth;
 
     final showRest = rest.isRunning && !expanded;
     final accent = _accentFor(
@@ -434,20 +433,9 @@ class _TopRow extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         if (rest.isRunning && expanded)
-          PulsingGlow(
-            glowColor: const Color(0xFFFFB020),
-            maxRadius: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFB020).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                restText,
-                style: const TextStyle(color: Color(0xFFFFB020), fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-            ),
+          Text(
+            restText,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
           ),
         if (expanded) ...[
           if (focusMode && workoutActive) ...[

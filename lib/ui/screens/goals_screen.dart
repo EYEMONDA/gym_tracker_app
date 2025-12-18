@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
-import '../widgets/animated_widgets.dart';
 
 class GoalsScreen extends StatefulWidget {
   const GoalsScreen({super.key});
@@ -49,8 +48,8 @@ class _GoalsScreenState extends State<GoalsScreen> with SingleTickerProviderStat
           // Goals Tab
           _GoalsTab(app: app),
           
-          // Achievements Tab
-          _AchievementsTab(app: app),
+          // Achievements Tab (placeholder)
+          const _AchievementsTab(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -94,37 +93,22 @@ class _GoalsTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              BounceIn(
-                child: Icon(Icons.flag_outlined, size: 64, color: Colors.white.withOpacity(0.3)),
-              ),
+              Icon(Icons.flag_outlined, size: 64, color: Colors.white.withOpacity(0.3)),
               const SizedBox(height: 16),
-              StaggeredListItem(
-                index: 0,
-                child: const Text(
-                  'No goals yet',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-                ),
+              const Text(
+                'No goals yet',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 8),
-              StaggeredListItem(
-                index: 1,
-                child: const Text(
-                  'Set fitness goals with milestones to track your progress and stay motivated.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xAAFFFFFF)),
-                ),
+              const Text(
+                'Set fitness goals with milestones to track your progress and stay motivated.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xAAFFFFFF)),
               ),
               const SizedBox(height: 24),
-              StaggeredListItem(
-                index: 2,
-                child: PulsingGlow(
-                  glowColor: const Color(0xFF4CAF50),
-                  maxRadius: 6,
-                  child: const Text(
-                    'Tap the + button to create your first goal',
-                    style: TextStyle(color: Color(0x88FFFFFF), fontSize: 12),
-                  ),
-                ),
+              const Text(
+                'Tap the + button to create your first goal',
+                style: TextStyle(color: Color(0x88FFFFFF), fontSize: 12),
               ),
             ],
           ),
@@ -132,32 +116,19 @@ class _GoalsTab extends StatelessWidget {
       );
     }
 
-    int itemIndex = 0;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (activeGoals.isNotEmpty) ...[
-          StaggeredListItem(
-            index: itemIndex++,
-            child: const Text('Active Goals', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-          ),
+          const Text('Active Goals', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
           const SizedBox(height: 12),
-          ...activeGoals.map((goal) => StaggeredListItem(
-            index: itemIndex++,
-            child: _GoalCard(goal: goal, app: app),
-          )),
+          ...activeGoals.map((goal) => _GoalCard(goal: goal, app: app)),
         ],
         if (completedGoals.isNotEmpty) ...[
           const SizedBox(height: 24),
-          StaggeredListItem(
-            index: itemIndex++,
-            child: const Text('Completed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-          ),
+          const Text('Completed', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
           const SizedBox(height: 12),
-          ...completedGoals.map((goal) => StaggeredListItem(
-            index: itemIndex++,
-            child: _GoalCard(goal: goal, app: app, isCompleted: true),
-          )),
+          ...completedGoals.map((goal) => _GoalCard(goal: goal, app: app, isCompleted: true)),
         ],
       ],
     );
@@ -224,11 +195,14 @@ class _GoalCard extends StatelessWidget {
               style: const TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
             ),
             const SizedBox(height: 6),
-            AnimatedProgressBar(
-              value: progress,
-              height: 6,
-              backgroundColor: const Color(0x22FFFFFF),
-              valueColor: isCompleted ? const Color(0xFF4CAF50) : _getCategoryColor(goal.category),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 6,
+                backgroundColor: const Color(0x22FFFFFF),
+                color: isCompleted ? const Color(0xFF4CAF50) : _getCategoryColor(goal.category),
+              ),
             ),
           ],
         ),
@@ -392,247 +366,171 @@ class _MilestoneTile extends StatelessWidget {
   }
 }
 
-class _AchievementsTab extends StatefulWidget {
-  const _AchievementsTab({required this.app});
-
-  final AppState app;
-
-  @override
-  State<_AchievementsTab> createState() => _AchievementsTabState();
-}
-
-class _AchievementsTabState extends State<_AchievementsTab> {
-  bool _showCelebration = false;
-
-  void _triggerCelebration() {
-    setState(() => _showCelebration = true);
-    HapticFeedback.heavyImpact();
-  }
+class _AchievementsTab extends StatelessWidget {
+  const _AchievementsTab();
 
   @override
   Widget build(BuildContext context) {
-    final achievements = AppState.achievements;
-    final unlockedCount = widget.app.unlockedAchievements.length;
-    final totalCount = achievements.length;
+    // Placeholder achievements
+    final achievements = [
+      _AchievementData(
+        title: 'First Workout',
+        description: 'Complete your first workout session',
+        icon: Icons.fitness_center,
+        isLocked: false,
+      ),
+      _AchievementData(
+        title: 'Week Warrior',
+        description: 'Work out 3 times in a single week',
+        icon: Icons.calendar_today,
+        isLocked: true,
+      ),
+      _AchievementData(
+        title: 'Streak Master',
+        description: 'Maintain a 7-day workout streak',
+        icon: Icons.local_fire_department,
+        isLocked: true,
+      ),
+      _AchievementData(
+        title: 'Century Club',
+        description: 'Log 100 total sets',
+        icon: Icons.looks_one,
+        isLocked: true,
+      ),
+      _AchievementData(
+        title: 'Heavy Lifter',
+        description: 'Lift your bodyweight on any exercise',
+        icon: Icons.fitness_center,
+        isLocked: true,
+      ),
+      _AchievementData(
+        title: 'Goal Getter',
+        description: 'Complete your first fitness goal',
+        icon: Icons.flag,
+        isLocked: true,
+      ),
+      _AchievementData(
+        title: 'Consistency King',
+        description: 'Work out for 4 consecutive weeks',
+        icon: Icons.emoji_events,
+        isLocked: true,
+      ),
+      _AchievementData(
+        title: 'PR Hunter',
+        description: 'Set a new personal record',
+        icon: Icons.trending_up,
+        isLocked: true,
+      ),
+    ];
 
-    return Stack(
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        ListView(
+        Container(
           padding: const EdgeInsets.all(16),
-          children: [
-            // Progress summary with animations
-            StaggeredListItem(
-              index: 0,
-              child: ScaleTap(
-                onTap: unlockedCount > 0 ? _triggerCelebration : null,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1A1A2E), Color(0xFF0A0A0A)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0A0A0A),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0x22FFFFFF)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.construction, color: Color(0xFFFFD700)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Coming Soon',
+                      style: TextStyle(fontWeight: FontWeight.w800),
                     ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0x33FFD700)),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          BounceIn(
-                            delay: const Duration(milliseconds: 200),
-                            child: PulsingGlow(
-                              glowColor: const Color(0xFFFFD700),
-                              enabled: unlockedCount > 0,
-                              maxRadius: 8,
-                              child: const Icon(Icons.emoji_events, color: Color(0xFFFFD700), size: 32),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    AnimatedNumber(
-                                      value: unlockedCount.toDouble(),
-                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-                                    ),
-                                    Text(
-                                      ' / $totalCount Unlocked',
-                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  unlockedCount == 0
-                                      ? 'Start working out to unlock achievements!'
-                                      : unlockedCount == totalCount
-                                          ? '🎉 Congratulations! All unlocked!'
-                                          : 'Tap to celebrate! Keep going!',
-                                  style: const TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      AnimatedProgressBar(
-                        value: totalCount > 0 ? unlockedCount / totalCount : 0,
-                        height: 10,
-                        valueColor: const Color(0xFFFFD700),
-                        backgroundColor: const Color(0x33FFFFFF),
-                      ),
-                    ],
-                  ),
+                    Text(
+                      'Achievements will unlock as you progress. Stay tuned!',
+                      style: TextStyle(color: Color(0xAAFFFFFF), fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            StaggeredListItem(
-              index: 1,
-              child: const Text('Achievements', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-            ),
-            const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.95,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              itemCount: achievements.length,
-              itemBuilder: (context, index) {
-                final achievement = achievements[index];
-                final isUnlocked = widget.app.isAchievementUnlocked(achievement.id);
-                final progress = widget.app.getAchievementProgress(achievement.id);
-                return StaggeredListItem(
-                  index: index + 2,
-                  child: _AchievementCard(
-                    achievement: achievement,
-                    isUnlocked: isUnlocked,
-                    progress: progress,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        // Celebration overlay
-        if (_showCelebration)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: ConfettiCelebration(
-                particleCount: 80,
-                duration: const Duration(seconds: 3),
-                onComplete: () {
-                  if (mounted) setState(() => _showCelebration = false);
-                },
-              ),
-            ),
+            ],
           ),
+        ),
+        const SizedBox(height: 16),
+        const Text('Achievements', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        const SizedBox(height: 12),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.1,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: achievements.length,
+          itemBuilder: (context, index) {
+            final achievement = achievements[index];
+            return _AchievementCard(achievement: achievement);
+          },
+        ),
       ],
     );
   }
 }
 
-class _AchievementCard extends StatelessWidget {
-  const _AchievementCard({
-    required this.achievement,
-    required this.isUnlocked,
-    required this.progress,
+class _AchievementData {
+  const _AchievementData({
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.isLocked,
   });
 
-  final Achievement achievement;
-  final bool isUnlocked;
-  final double progress;
+  final String title;
+  final String description;
+  final IconData icon;
+  final bool isLocked;
+}
+
+class _AchievementCard extends StatelessWidget {
+  const _AchievementCard({required this.achievement});
+
+  final _AchievementData achievement;
 
   @override
   Widget build(BuildContext context) {
-    final icon = IconData(achievement.iconCodePoint, fontFamily: 'MaterialIcons');
-    
-    return ScaleTap(
-      onTap: () {
-        // Show achievement details
-        showDialog(
-          context: context,
-          builder: (_) => _AchievementDetailDialog(
-            achievement: achievement,
-            isUnlocked: isUnlocked,
-            progress: progress,
-          ),
-        );
-      },
-      child: _buildCard(icon),
-    );
-  }
-
-  Widget _buildCard(IconData icon) {
-    
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isUnlocked 
-            ? const Color(0xFF1A1A2E)
-            : const Color(0xFF070707),
+        color: achievement.isLocked 
+            ? const Color(0xFF070707)
+            : const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isUnlocked 
-              ? const Color(0xFFFFD700).withOpacity(0.4)
-              : const Color(0x22FFFFFF),
-          width: isUnlocked ? 2 : 1,
+          color: achievement.isLocked 
+              ? const Color(0x22FFFFFF)
+              : const Color(0xFFFFD700).withOpacity(0.3),
         ),
-        boxShadow: isUnlocked
-            ? [
-                BoxShadow(
-                  color: const Color(0xFFFFD700).withOpacity(0.15),
-                  blurRadius: 12,
-                  spreadRadius: 0,
-                ),
-              ]
-            : null,
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Progress ring (when not unlocked)
-              if (!isUnlocked)
-                SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: CircularProgressIndicator(
-                    value: progress,
-                    strokeWidth: 3,
-                    backgroundColor: const Color(0x22FFFFFF),
-                    valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4CAF50)),
-                  ),
-                ),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isUnlocked 
-                      ? const Color(0xFFFFD700).withOpacity(0.2)
-                      : const Color(0x22FFFFFF),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isUnlocked ? icon : Icons.lock,
-                  color: isUnlocked 
-                      ? const Color(0xFFFFD700)
-                      : const Color(0x66FFFFFF),
-                  size: 22,
-                ),
-              ),
-            ],
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: achievement.isLocked 
+                  ? const Color(0x22FFFFFF)
+                  : const Color(0xFFFFD700).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              achievement.isLocked ? Icons.lock : achievement.icon,
+              color: achievement.isLocked 
+                  ? const Color(0x66FFFFFF)
+                  : const Color(0xFFFFD700),
+              size: 24,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -641,9 +539,9 @@ class _AchievementCard extends StatelessWidget {
             style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize: 12,
-              color: isUnlocked 
-                  ? Colors.white
-                  : const Color(0x88FFFFFF),
+              color: achievement.isLocked 
+                  ? const Color(0x88FFFFFF)
+                  : Colors.white,
             ),
           ),
           const SizedBox(height: 4),
@@ -654,164 +552,12 @@ class _AchievementCard extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 10,
-              color: isUnlocked 
-                  ? const Color(0xAAFFFFFF)
-                  : const Color(0x66FFFFFF),
+              color: achievement.isLocked 
+                  ? const Color(0x66FFFFFF)
+                  : const Color(0xAAFFFFFF),
             ),
           ),
-          if (!isUnlocked && progress > 0) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${(progress * 100).toInt()}%',
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF4CAF50),
-              ),
-            ),
-          ],
         ],
-      ),
-    );
-  }
-}
-
-class _AchievementDetailDialog extends StatelessWidget {
-  const _AchievementDetailDialog({
-    required this.achievement,
-    required this.isUnlocked,
-    required this.progress,
-  });
-
-  final Achievement achievement;
-  final bool isUnlocked;
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = IconData(achievement.iconCodePoint, fontFamily: 'MaterialIcons');
-    
-    return Dialog(
-      backgroundColor: const Color(0xFF0A0A0A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icon with animation
-            BounceIn(
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: isUnlocked
-                      ? const Color(0xFFFFD700).withOpacity(0.2)
-                      : const Color(0x22FFFFFF),
-                  shape: BoxShape.circle,
-                  boxShadow: isUnlocked
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFFFFD700).withOpacity(0.3),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Icon(
-                  isUnlocked ? icon : Icons.lock,
-                  color: isUnlocked ? const Color(0xFFFFD700) : const Color(0x66FFFFFF),
-                  size: 40,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Title
-            Text(
-              achievement.title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            // Description
-            Text(
-              achievement.description,
-              style: const TextStyle(
-                color: Color(0xAAFFFFFF),
-                fontSize: 14,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            // Progress or unlocked status
-            if (isUnlocked) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.5)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Unlocked!',
-                      style: TextStyle(
-                        color: Color(0xFF4CAF50),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Progress: ',
-                        style: TextStyle(color: Color(0xAAFFFFFF)),
-                      ),
-                      AnimatedNumber(
-                        value: progress * 100,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF4CAF50),
-                        ),
-                        suffix: '%',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: 200,
-                    child: AnimatedProgressBar(
-                      value: progress,
-                      height: 8,
-                      valueColor: const Color(0xFF4CAF50),
-                      backgroundColor: const Color(0x33FFFFFF),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 20),
-            // Close button
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
       ),
     );
   }
