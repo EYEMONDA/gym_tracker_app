@@ -40,22 +40,33 @@ class _RootShellState extends State<RootShell> {
       const SettingsScreen(),
     ];
 
+    // Workout tab (0) = centered Dynamic Island, others = top
+    final isWorkoutTab = _tabIndex == 0;
+
     return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(child: tabs[_tabIndex]),
-          const Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: EdgeInsets.only(top: 8),
+          // Dynamic Island position changes based on tab
+          if (isWorkoutTab)
+            const Positioned.fill(
+              child: SafeArea(
                 child: Center(child: DynamicIsland()),
               ),
+            )
+          else
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Center(child: DynamicIsland()),
+                ),
+              ),
             ),
-          ),
           if (!app.loaded)
             const Positioned.fill(
               child: IgnorePointer(
