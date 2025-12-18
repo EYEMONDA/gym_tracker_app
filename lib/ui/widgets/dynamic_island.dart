@@ -189,13 +189,6 @@ class _CollapsedContent extends StatelessWidget {
             letterSpacing: 0.5,
           ),
         ),
-<<<<<<< HEAD
-        const SizedBox(width: 8),
-        if (rest.isRunning && expanded)
-          Text(
-            restText,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
-=======
         Text(
           subtitle,
           style: TextStyle(
@@ -203,7 +196,6 @@ class _CollapsedContent extends StatelessWidget {
             fontSize: 10,
             fontWeight: FontWeight.w600,
             letterSpacing: 1,
->>>>>>> origin/main
           ),
         ),
       ],
