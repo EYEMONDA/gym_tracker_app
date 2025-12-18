@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../state/app_state.dart';
-import '../widgets/animated_widgets.dart';
 
 /// Minimal workout screen - Dynamic Island is the focus.
 /// 
