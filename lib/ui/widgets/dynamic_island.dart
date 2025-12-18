@@ -151,14 +151,14 @@ class _DynamicIslandState extends State<DynamicIsland> with SingleTickerProvider
     }
 
     final size = MediaQuery.sizeOf(context);
-    final maxWidth = min(560, size.width - 24);
-    final collapsedWidth = min(workoutActive && focusMode ? 360 : 220, size.width - 24);
+    final double maxWidth = min(560.0, size.width - 24).toDouble();
+    final double collapsedWidth = min(workoutActive && focusMode ? 360.0 : 220.0, size.width - 24).toDouble();
     final expanded = app.isSearchExpanded;
 
-    final baseHeight = 42.0;
-    final expandedHeight = min(320.0, size.height * 0.42);
-    final height = expanded ? expandedHeight : baseHeight;
-    final width = expanded ? maxWidth : collapsedWidth;
+    final double baseHeight = 42.0;
+    final double expandedHeight = min(320.0, size.height * 0.42).toDouble();
+    final double height = expanded ? expandedHeight : baseHeight;
+    final double width = expanded ? maxWidth : collapsedWidth;
 
     final showRest = rest.isRunning && !expanded;
     final accent = _accentFor(
