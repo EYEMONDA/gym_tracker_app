@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,9 +44,6 @@ class AppState extends ChangeNotifier {
 
   /// User-defined fitness goals with milestones.
   final List<FitnessGoal> fitnessGoals = [];
-
-  /// Unlocked achievement IDs.
-  final Set<String> unlockedAchievements = {};
 
   /// Which exercise is currently “focused” for fast logging.
   int activeExerciseIndex = 0;
@@ -98,8 +94,41 @@ class AppState extends ChangeNotifier {
   /// Smart rest: auto-adjust rest time based on exercise type.
   bool smartRestEnabled = true;
 
-  /// Rest timer alerts: vibration when timer completes.
-  bool restTimerAlertsEnabled = true;
+  /// Favorite exercises for quick access.
+  final Set<String> favoriteExercises = {};
+
+  /// Toggle favorite status of an exercise.
+  Future<void> toggleFavoriteExercise(String exerciseName) async {
+    final name = exerciseName.trim();
+    if (name.isEmpty) return;
+    if (favoriteExercises.contains(name)) {
+      favoriteExercises.remove(name);
+    } else {
+      favoriteExercises.add(name);
+    }
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Check if an exercise is favorited.
+  bool isFavoriteExercise(String exerciseName) {
+    return favoriteExercises.contains(exerciseName.trim());
+  }
+
+  /// Add multiple exercises to active workout at once.
+  void addMultipleExercisesToActive(List<String> exerciseNames) {
+    final draft = activeSession;
+    if (draft == null) return;
+    for (final name in exerciseNames) {
+      final trimmed = name.trim();
+      if (trimmed.isEmpty) continue;
+      draft.exercises.add(ExerciseDraft(name: trimmed));
+    }
+    if (draft.exercises.isNotEmpty) {
+      activeExerciseIndex = draft.exercises.length - 1;
+    }
+    notifyListeners();
+  }
 
   /// Compound exercises that warrant longer rest times.
   static const compoundExercises = {
@@ -284,15 +313,14 @@ class AppState extends ChangeNotifier {
           ..addAll(db.routeActivityLogs);
         supersetModeEnabled = db.supersetModeEnabled;
         smartRestEnabled = db.smartRestEnabled;
-        restTimerAlertsEnabled = db.restTimerAlertsEnabled;
         experimentalHeatMapEnabled = db.experimentalHeatMapEnabled;
         userProfile = db.userProfile;
         fitnessGoals
           ..clear()
           ..addAll(db.fitnessGoals);
-        unlockedAchievements
+        favoriteExercises
           ..clear()
-          ..addAll(db.unlockedAchievements);
+          ..addAll(db.favoriteExercises);
       } catch (_) {
         // If the DB is corrupt, keep the app usable.
       }
@@ -324,11 +352,10 @@ class AppState extends ChangeNotifier {
       routeActivityLogs: routeActivityLogs,
       supersetModeEnabled: supersetModeEnabled,
       smartRestEnabled: smartRestEnabled,
-      restTimerAlertsEnabled: restTimerAlertsEnabled,
       experimentalHeatMapEnabled: experimentalHeatMapEnabled,
       userProfile: userProfile,
       fitnessGoals: fitnessGoals,
-      unlockedAchievements: unlockedAchievements,
+      favoriteExercises: favoriteExercises.toList(),
     );
     await prefs.setString(_prefsKeyDb, jsonEncode(db.toJson()));
   }
@@ -385,8 +412,6 @@ class AppState extends ChangeNotifier {
     activePlannedWorkoutId = null;
     stopRestTimer();
     await _persist();
-    // Check for newly unlocked achievements
-    checkAndUnlockAchievements();
     notifyListeners();
   }
 
@@ -464,14 +489,6 @@ class AppState extends ChangeNotifier {
       if (DateTime.now().isAfter(state.endsAt!)) {
         stopRestTimer();
         restTimer = RestTimerState.done(lastDurationSeconds: s);
-        // Vibration alert when timer completes
-        if (restTimerAlertsEnabled) {
-          HapticFeedback.heavyImpact();
-          // Double vibration for stronger alert
-          Future.delayed(const Duration(milliseconds: 200), () {
-            HapticFeedback.heavyImpact();
-          });
-        }
         notifyListeners();
       } else {
         // tick
@@ -595,262 +612,6 @@ class AppState extends ChangeNotifier {
   /// Get all completed goals.
   List<FitnessGoal> get completedGoals => 
       fitnessGoals.where((g) => getGoalProgress(g) >= 1.0).toList();
-
-  // ---------------------------
-  // Achievements
-  // ---------------------------
-
-  /// All available achievements.
-  static const achievements = <Achievement>[
-    Achievement(
-      id: 'first_workout',
-      title: 'First Workout',
-      description: 'Complete your first workout session',
-      iconCodePoint: 0xe1e1, // fitness_center
-    ),
-    Achievement(
-      id: 'week_warrior',
-      title: 'Week Warrior',
-      description: 'Work out 3 times in a single week',
-      iconCodePoint: 0xe614, // event_repeat
-    ),
-    Achievement(
-      id: 'streak_master',
-      title: 'Streak Master',
-      description: 'Maintain a 7-day workout streak',
-      iconCodePoint: 0xe518, // local_fire_department
-    ),
-    Achievement(
-      id: 'century_club',
-      title: 'Century Club',
-      description: 'Log 100 total sets',
-      iconCodePoint: 0xe3f4, // looks_one
-    ),
-    Achievement(
-      id: 'heavy_lifter',
-      title: 'Heavy Lifter',
-      description: 'Lift 100kg (220lb) or more on any exercise',
-      iconCodePoint: 0xe1e1, // fitness_center
-    ),
-    Achievement(
-      id: 'goal_getter',
-      title: 'Goal Getter',
-      description: 'Complete your first fitness goal',
-      iconCodePoint: 0xe153, // flag
-    ),
-    Achievement(
-      id: 'consistency_king',
-      title: 'Consistency King',
-      description: 'Work out for 4 consecutive weeks',
-      iconCodePoint: 0xe99a, // emoji_events
-    ),
-    Achievement(
-      id: 'pr_hunter',
-      title: 'PR Hunter',
-      description: 'Set 5 personal records',
-      iconCodePoint: 0xe8e5, // trending_up
-    ),
-    Achievement(
-      id: 'early_bird',
-      title: 'Early Bird',
-      description: 'Complete a workout before 7 AM',
-      iconCodePoint: 0xe81a, // wb_sunny
-    ),
-    Achievement(
-      id: 'night_owl',
-      title: 'Night Owl',
-      description: 'Complete a workout after 9 PM',
-      iconCodePoint: 0xe51c, // nights_stay
-    ),
-    Achievement(
-      id: 'volume_king',
-      title: 'Volume King',
-      description: 'Log 50 sets in a single week',
-      iconCodePoint: 0xe6e1, // bar_chart
-    ),
-    Achievement(
-      id: 'dedicated',
-      title: 'Dedicated',
-      description: 'Complete 25 workout sessions',
-      iconCodePoint: 0xea23, // workspace_premium
-    ),
-  ];
-
-  /// Check if an achievement is unlocked.
-  bool isAchievementUnlocked(String achievementId) {
-    return unlockedAchievements.contains(achievementId);
-  }
-
-  /// Check and unlock any newly earned achievements.
-  Future<List<Achievement>> checkAndUnlockAchievements() async {
-    final newlyUnlocked = <Achievement>[];
-
-    for (final achievement in achievements) {
-      if (unlockedAchievements.contains(achievement.id)) continue;
-
-      final earned = _checkAchievementCondition(achievement.id);
-      if (earned) {
-        unlockedAchievements.add(achievement.id);
-        newlyUnlocked.add(achievement);
-      }
-    }
-
-    if (newlyUnlocked.isNotEmpty) {
-      await _persist();
-      notifyListeners();
-    }
-
-    return newlyUnlocked;
-  }
-
-  bool _checkAchievementCondition(String id) {
-    switch (id) {
-      case 'first_workout':
-        return sessions.isNotEmpty;
-
-      case 'week_warrior':
-        return workoutsThisWeek >= 3;
-
-      case 'streak_master':
-        return currentStreak >= 7;
-
-      case 'century_club':
-        final totalSets = sessions.fold<int>(
-          0,
-          (sum, s) => sum + s.exercises.fold<int>(0, (eSum, e) => eSum + e.sets.length),
-        );
-        return totalSets >= 100;
-
-      case 'heavy_lifter':
-        for (final session in sessions) {
-          for (final exercise in session.exercises) {
-            for (final set in exercise.sets) {
-              if (set.weight >= 100 && set.unit == 'kg') return true;
-              if (set.weight >= 220 && set.unit == 'lb') return true;
-            }
-          }
-        }
-        return false;
-
-      case 'goal_getter':
-        return completedGoals.isNotEmpty;
-
-      case 'consistency_king':
-        // Check if worked out at least once per week for 4 weeks
-        if (sessions.length < 4) return false;
-        final now = DateTime.now();
-        int consecutiveWeeks = 0;
-        for (int w = 0; w < 8; w++) {
-          final weekStart = DateTime(now.year, now.month, now.day)
-              .subtract(Duration(days: now.weekday - 1 + (w * 7)));
-          final weekEnd = weekStart.add(const Duration(days: 7));
-          final hasWorkout = sessions.any((s) =>
-              !s.startedAt.isBefore(weekStart) && s.startedAt.isBefore(weekEnd));
-          if (hasWorkout) {
-            consecutiveWeeks++;
-          } else if (w > 0) {
-            break;
-          }
-        }
-        return consecutiveWeeks >= 4;
-
-      case 'pr_hunter':
-        // Count unique exercises with PRs
-        final prs = <String>{};
-        final bestByExercise = <String, double>{};
-        for (final session in sessions) {
-          for (final exercise in session.exercises) {
-            final name = exercise.name.toLowerCase();
-            for (final set in exercise.sets) {
-              if (set.weight <= 0 || set.reps <= 0) continue;
-              final est1rm = set.weight * (1 + set.reps / 30.0);
-              if (est1rm > (bestByExercise[name] ?? 0)) {
-                if (bestByExercise.containsKey(name)) {
-                  prs.add(name);
-                }
-                bestByExercise[name] = est1rm;
-              }
-            }
-          }
-        }
-        return prs.length >= 5;
-
-      case 'early_bird':
-        return sessions.any((s) => s.startedAt.hour < 7);
-
-      case 'night_owl':
-        return sessions.any((s) => s.endedAt.hour >= 21);
-
-      case 'volume_king':
-        final now = DateTime.now();
-        final weekStart = DateTime(now.year, now.month, now.day)
-            .subtract(Duration(days: now.weekday - 1));
-        int setsThisWeek = 0;
-        for (final session in sessions) {
-          if (!session.startedAt.isBefore(weekStart)) {
-            setsThisWeek += session.exercises.fold<int>(
-              0,
-              (sum, e) => sum + e.sets.length,
-            );
-          }
-        }
-        return setsThisWeek >= 50;
-
-      case 'dedicated':
-        return sessions.length >= 25;
-
-      default:
-        return false;
-    }
-  }
-
-  /// Get achievement progress (0.0 to 1.0) for display.
-  double getAchievementProgress(String id) {
-    if (unlockedAchievements.contains(id)) return 1.0;
-
-    switch (id) {
-      case 'first_workout':
-        return sessions.isEmpty ? 0.0 : 1.0;
-
-      case 'week_warrior':
-        return (workoutsThisWeek / 3.0).clamp(0.0, 1.0);
-
-      case 'streak_master':
-        return (currentStreak / 7.0).clamp(0.0, 1.0);
-
-      case 'century_club':
-        final totalSets = sessions.fold<int>(
-          0,
-          (sum, s) => sum + s.exercises.fold<int>(0, (eSum, e) => eSum + e.sets.length),
-        );
-        return (totalSets / 100.0).clamp(0.0, 1.0);
-
-      case 'heavy_lifter':
-        double maxWeight = 0;
-        for (final session in sessions) {
-          for (final exercise in session.exercises) {
-            for (final set in exercise.sets) {
-              final weightKg = set.unit == 'lb' ? set.weight * 0.453592 : set.weight;
-              if (weightKg > maxWeight) maxWeight = weightKg;
-            }
-          }
-        }
-        return (maxWeight / 100.0).clamp(0.0, 1.0);
-
-      case 'goal_getter':
-        if (fitnessGoals.isEmpty) return 0.0;
-        final bestProgress = fitnessGoals
-            .map((g) => getGoalProgress(g))
-            .reduce((a, b) => a > b ? a : b);
-        return bestProgress;
-
-      case 'dedicated':
-        return (sessions.length / 25.0).clamp(0.0, 1.0);
-
-      default:
-        return 0.0;
-    }
-  }
 
   /// Get muscle groups targeted by an exercise name.
   List<MuscleGroup> getMuscleGroups(String exerciseName) {
@@ -1153,13 +914,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setRestTimerAlertsEnabled(bool enabled) async {
-    if (restTimerAlertsEnabled == enabled) return;
-    restTimerAlertsEnabled = enabled;
-    await _persist();
-    notifyListeners();
-  }
-
   /// Toggle an exercise index in/out of the superset pair list.
   void toggleSupersetExercise(int index) {
     if (supersetPairedIndices.contains(index)) {
@@ -1314,14 +1068,12 @@ class AppState extends ChangeNotifier {
     experimentalHeatMapEnabled = false;
     supersetModeEnabled = false;
     smartRestEnabled = true;
-    restTimerAlertsEnabled = true;
     supersetPairedIndices = [];
     activeExerciseIndex = 0;
     defaultRestSeconds = 90;
     weeklyWorkoutGoal = 3;
     userProfile = null;
     fitnessGoals.clear();
-    unlockedAchievements.clear();
     routineTemplates
       ..clear()
       ..addAll(_defaultTemplates());
@@ -1597,7 +1349,7 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    return hits.take(8).toList();
+    return hits.take(15).toList();
   }
 
   String _newId() {
@@ -1636,11 +1388,10 @@ class AppDb {
     required this.routeActivityLogs,
     required this.supersetModeEnabled,
     required this.smartRestEnabled,
-    required this.restTimerAlertsEnabled,
     required this.experimentalHeatMapEnabled,
     required this.userProfile,
     required this.fitnessGoals,
-    required this.unlockedAchievements,
+    required this.favoriteExercises,
   });
 
   final List<WorkoutSession> sessions;
@@ -1656,11 +1407,10 @@ class AppDb {
   final List<RouteActivityLog> routeActivityLogs;
   final bool supersetModeEnabled;
   final bool smartRestEnabled;
-  final bool restTimerAlertsEnabled;
   final bool experimentalHeatMapEnabled;
   final UserProfile? userProfile;
   final List<FitnessGoal> fitnessGoals;
-  final Set<String> unlockedAchievements;
+  final List<String> favoriteExercises;
 
   factory AppDb.fromJson(Map<String, Object?> json) {
     final rawSessions = (json['sessions'] as List<dynamic>? ?? const []);
@@ -1670,7 +1420,6 @@ class AppDb {
     final rawRouteLogs = (json['routeActivityLogs'] as List<dynamic>? ?? const []);
     final rawProfile = json['userProfile'] as Map<String, Object?>?;
     final rawGoals = (json['fitnessGoals'] as List<dynamic>? ?? const []);
-    final rawAchievements = (json['unlockedAchievements'] as List<dynamic>? ?? const []);
     return AppDb(
       sessions: rawSessions
           .whereType<Map<String, Object?>>()
@@ -1700,11 +1449,12 @@ class AppDb {
           rawRouteLogs.whereType<Map<String, Object?>>().map(RouteActivityLog.fromJson).where((l) => l.routeId.isNotEmpty).toList(),
       supersetModeEnabled: (json['supersetModeEnabled'] as bool?) ?? false,
       smartRestEnabled: (json['smartRestEnabled'] as bool?) ?? true,
-      restTimerAlertsEnabled: (json['restTimerAlertsEnabled'] as bool?) ?? true,
       experimentalHeatMapEnabled: (json['experimentalHeatMapEnabled'] as bool?) ?? false,
       userProfile: rawProfile != null ? UserProfile.fromJson(rawProfile) : null,
       fitnessGoals: rawGoals.whereType<Map<String, Object?>>().map(FitnessGoal.fromJson).toList(),
-      unlockedAchievements: rawAchievements.whereType<String>().toSet(),
+      favoriteExercises: (json['favoriteExercises'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .toList(),
     );
   }
 
@@ -1722,11 +1472,10 @@ class AppDb {
         'routeActivityLogs': routeActivityLogs.map((l) => l.toJson()).toList(),
         'supersetModeEnabled': supersetModeEnabled,
         'smartRestEnabled': smartRestEnabled,
-        'restTimerAlertsEnabled': restTimerAlertsEnabled,
         'experimentalHeatMapEnabled': experimentalHeatMapEnabled,
         'userProfile': userProfile?.toJson(),
         'fitnessGoals': fitnessGoals.map((g) => g.toJson()).toList(),
-        'unlockedAchievements': unlockedAchievements.toList(),
+        'favoriteExercises': favoriteExercises,
       };
 }
 
@@ -2508,20 +2257,5 @@ extension GoalCategoryX on GoalCategory {
         return 0xe838; // flag
     }
   }
-}
-
-/// Achievement definition.
-class Achievement {
-  final String id;
-  final String title;
-  final String description;
-  final int iconCodePoint;
-
-  const Achievement({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.iconCodePoint,
-  });
 }
 

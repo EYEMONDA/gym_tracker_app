@@ -129,26 +129,104 @@ class _StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
+<<<<<<< HEAD
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x22FFFFFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Ready when you are',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.3),
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1,
+          const SizedBox(height: 6),
+          const Text(
+            'No login. Everything is stored locally on this device/browser.',
+            style: TextStyle(color: Color(0xAAFFFFFF)),
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onStart,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Start workout'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveWorkoutHeader extends StatelessWidget {
+  const _ActiveWorkoutHeader({
+    required this.startedAt,
+    required this.onAddExercise,
+    required this.onRest,
+    required this.onSave,
+    required this.onDiscard,
+  });
+
+  final DateTime startedAt;
+  final VoidCallback onAddExercise;
+  final VoidCallback onRest;
+  final VoidCallback onSave;
+  final VoidCallback onDiscard;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0A0A),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x22FFFFFF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Started ${TimeOfDay.fromDateTime(startedAt).format(context)}',
+            style: const TextStyle(color: Color(0xAAFFFFFF)),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              FilledButton.icon(
+                onPressed: onAddExercise,
+                icon: const Icon(Icons.add),
+                label: const Text('Exercise'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onRest,
+                icon: const Icon(Icons.timer),
+                label: const Text('Rest'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: onSave,
+                icon: const Icon(Icons.check),
+                label: const Text('Save'),
+              ),
+              TextButton.icon(
+                onPressed: onDiscard,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Discard'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

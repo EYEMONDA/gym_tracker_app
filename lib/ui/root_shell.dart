@@ -7,7 +7,7 @@ import 'screens/progress_screen.dart';
 import 'screens/schedule_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/workout_screen.dart';
-import 'widgets/dynamic_island.dart';
+import 'widgets/morphing_island.dart';
 
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
@@ -40,33 +40,22 @@ class _RootShellState extends State<RootShell> {
       const SettingsScreen(),
     ];
 
-    // Workout tab (0) = centered Dynamic Island, others = top
-    final isWorkoutTab = _tabIndex == 0;
-
     return Scaffold(
       body: Stack(
         children: [
           Positioned.fill(child: tabs[_tabIndex]),
-          // Dynamic Island position changes based on tab
-          if (isWorkoutTab)
-            const Positioned.fill(
-              child: SafeArea(
-                child: Center(child: DynamicIsland()),
-              ),
-            )
-          else
-            const Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Center(child: DynamicIsland()),
-                ),
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Center(child: MorphingIsland()),
               ),
             ),
+          ),
           if (!app.loaded)
             const Positioned.fill(
               child: IgnorePointer(
