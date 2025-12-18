@@ -129,40 +129,26 @@ class _StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0A0A0A),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0x22FFFFFF)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Ready when you are',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'No login. Everything is stored locally on this device/browser.',
-            style: TextStyle(color: Color(0xAAFFFFFF)),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.3),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1,
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: onStart,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Start workout'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

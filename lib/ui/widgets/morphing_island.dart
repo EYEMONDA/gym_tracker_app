@@ -19,35 +19,18 @@ class MorphingIsland extends StatefulWidget {
   State<MorphingIsland> createState() => _MorphingIslandState();
 }
 
-class _MorphingIslandState extends State<MorphingIsland> with SingleTickerProviderStateMixin {
+class _MorphingIslandState extends State<MorphingIsland> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   bool _isSearchExpanded = false;
   bool _showRoutinesPanel = false;
   bool _showHistoryPanel = false;
   bool _showMultiSelectPanel = false;
-  
-  late AnimationController _morphController;
-  late Animation<double> _morphAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _morphController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _morphAnimation = CurvedAnimation(
-      parent: _morphController,
-      curve: Curves.easeOutCubic,
-    );
-  }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocus.dispose();
-    _morphController.dispose();
     super.dispose();
   }
 
@@ -72,7 +55,7 @@ class _MorphingIslandState extends State<MorphingIsland> with SingleTickerProvid
     final app = AppScope.of(context);
     final workoutActive = app.activeSession != null;
     final size = MediaQuery.sizeOf(context);
-    final maxWidth = min(600, size.width - 32);
+    final maxWidth = min(600.0, size.width - 32.0);
     
     // Determine which mode to show
     if (workoutActive) {
